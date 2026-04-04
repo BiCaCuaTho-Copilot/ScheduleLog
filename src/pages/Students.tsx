@@ -257,5 +257,3 @@ function StudentModal({
     </Dialog>
   );
 }
-
-import { Users } from "lucide-react";
