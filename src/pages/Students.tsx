@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAppStore } from "@/components/Layout";
 import { uuid, formatVND, getNextColor, getTextColor, TIER1_COLORS } from "@/lib/helpers";
 import type { Student } from "@/lib/store";
@@ -16,19 +16,42 @@ export default function StudentsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Student | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
 
   const getDebt = (studentId: string) => {
     const totalFee = data.sessions
       .filter((s) => s.studentId === studentId && s.attended)
       .reduce((sum, s) => {
         const st = data.students.find((x) => x.id === studentId);
-        return sum + (st?.pricePerHour ?? 0) * s.duration;
+        return sum + (st?.pricePerHour ?? 0);
       }, 0);
     const totalPaid = data.payments
       .filter((p) => p.studentId === studentId)
       .reduce((sum, p) => sum + p.amount, 0);
     return Math.max(0, totalFee - totalPaid);
   };
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  const getScheduledSessions = (studentId: string) =>
+    data.sessions.filter((s) => s.studentId === studentId).length;
+
+  const getTotalBuoi = (s: Student) => {
+    if (!s.bookedSessions) return null;
+    return s.bookedSessions + (s.freeSessions ?? 0);
+  };
+
+  const getRemainingBuoi = (s: Student) => {
+    const total = getTotalBuoi(s);
+    if (total === null) return null;
+    return total - getScheduledSessions(s.id);
+  };
+
+  const getCompletedSessions = (studentId: string) =>
+    data.sessions.filter((s) => s.studentId === studentId && s.attended && s.date <= todayStr).length;
+
+  const getTotalPaid = (studentId: string) =>
+    data.payments.filter((p) => p.studentId === studentId).reduce((sum, p) => sum + p.amount, 0);
 
   const openAdd = () => {
     setEditing(null);
@@ -48,9 +71,17 @@ export default function StudentsPage() {
             {data.students.length} học viên · {data.students.filter((s) => s.status === "active").length} đang hoạt động
           </p>
         </div>
-        <Button onClick={openAdd} className="gap-2">
-          <Plus className="w-4 h-4" /> Thêm học viên
-        </Button>
+        <div className="flex items-center gap-2">
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Tìm theo tên..."
+            className="w-48 h-9"
+          />
+          <Button onClick={openAdd} className="gap-2">
+            <Plus className="w-4 h-4" /> Thêm học viên
+          </Button>
+        </div>
       </div>
 
       {data.students.length === 0 ? (
@@ -63,9 +94,16 @@ export default function StudentsPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {data.students.map((s) => {
+          {data.students.filter((s) => s.name.toLowerCase().includes(search.toLowerCase())).map((s) => {
             const debt = getDebt(s.id);
             const textColor = getTextColor(s.color);
+            const remaining = getRemainingBuoi(s);
+            const totalBuoi = getTotalBuoi(s);
+            const completedCount = getCompletedSessions(s.id);
+            const completedAmount = completedCount * s.pricePerHour;
+            const totalFee = s.bookedSessions != null ? s.bookedSessions * s.pricePerHour : null;
+            const depositAmount = s.depositSessions != null ? s.depositSessions * s.pricePerHour : null;
+            const totalPaid = getTotalPaid(s.id);
             return (
               <div key={s.id} className="bg-card rounded-lg border p-4 card-hover">
                 <div className="flex items-start gap-3">
@@ -77,7 +115,13 @@ export default function StudentsPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-card-foreground truncate">{s.name}</p>
-                    <p className="text-sm text-muted-foreground">{formatVND(s.pricePerHour)}/giờ</p>
+                    <p className="text-sm text-muted-foreground">{formatVND(s.pricePerHour)}/buổi</p>
+                    {remaining !== null && totalBuoi !== null && (
+                      <p className={`text-xs font-medium mt-0.5 ${remaining <= 0 ? "text-destructive" : "text-primary"}`}>
+                        Còn {remaining}/{totalBuoi} buổi
+                        {s.freeSessions ? <span className="text-muted-foreground font-normal"> ({s.bookedSessions}+{s.freeSessions} KM)</span> : null}
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-2 mt-3">
@@ -90,11 +134,41 @@ export default function StudentsPage() {
                   >
                     {s.status === "active" ? "Active" : "Inactive"}
                   </span>
+                  {remaining !== null && remaining <= 0 && (
+                    <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-destructive/15 text-destructive">
+                      Hết buổi
+                    </span>
+                  )}
                   {debt > 0 && (
                     <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-destructive/15 text-destructive">
                       Nợ {formatVND(debt)}
                     </span>
                   )}
+                </div>
+                <div className="mt-3 pt-3 border-t space-y-1.5 text-xs">
+                  {totalFee !== null && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Tổng tiền học</span>
+                      <span className="font-medium">{formatVND(totalFee)}</span>
+                    </div>
+                  )}
+                  {depositAmount !== null && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Đặt cọc ({s.depositSessions} buổi)</span>
+                      <span className="font-medium text-amber-600">{formatVND(depositAmount)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Đã hoàn thành</span>
+                    <div className="text-right">
+                      <span className="font-medium">{completedCount} buổi</span>
+                      <span className="block text-muted-foreground/70">≈ {formatVND(completedAmount)}</span>
+                    </div>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Đã thanh toán</span>
+                    <span className="font-medium text-success">{formatVND(totalPaid)}</span>
+                  </div>
                 </div>
                 <div className="flex gap-2 mt-3 pt-3 border-t">
                   <Button variant="ghost" size="sm" onClick={() => openEdit(s)} className="flex-1 gap-1">
@@ -164,25 +238,42 @@ function StudentModal({
   onSave: (s: Student) => void;
 }) {
   const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
   const [price, setPrice] = useState("");
+  const [bookedSessions, setBookedSessions] = useState("");
+  const [freeSessions, setFreeSessions] = useState("");
+  const [depositSessions, setDepositSessions] = useState("");
   const [status, setStatus] = useState<"active" | "inactive">("active");
   const [color, setColor] = useState("#6c63ff");
 
-  // Reset form when dialog opens
-  const handleOpenChange = (o: boolean) => {
-    if (o) {
-      if (student) {
-        setName(student.name);
-        setPrice(String(student.pricePerHour));
-        setStatus(student.status);
-        setColor(student.color);
-      } else {
-        setName("");
-        setPrice("");
-        setStatus("active");
-        setColor(getNextColor(usedColors));
-      }
+  // Reset form whenever the dialog opens or the student being edited changes
+  useEffect(() => {
+    if (!open) return;
+    if (student) {
+      setName(student.name);
+      setEmail(student.email ?? "");
+      setPrice(String(student.pricePerHour));
+      setBookedSessions(student.bookedSessions != null ? String(student.bookedSessions) : "");
+      setFreeSessions(student.freeSessions != null ? String(student.freeSessions) : "");
+      setDepositSessions(student.depositSessions != null ? String(student.depositSessions) : "");
+      setStatus(student.status);
+      setColor(student.color);
+    } else {
+      setName("");
+      setEmail("");
+      setPrice("");
+      setBookedSessions("");
+      setFreeSessions("");
+      setDepositSessions("");
+      setStatus("active");
+      setColor(getNextColor(usedColors));
     }
+  }, [open, student]);
+
+  const priceNum = Number(price) || 0;
+  const depositAmount = depositSessions !== "" ? Number(depositSessions) * priceNum : null;
+
+  const handleOpenChange = (o: boolean) => {
     if (!o) onClose();
   };
 
@@ -191,7 +282,12 @@ function StudentModal({
     onSave({
       id: student?.id ?? uuid(),
       name: name.trim(),
+      email: email.trim() || undefined,
       pricePerHour: Number(price),
+      priceHistory: student?.priceHistory,
+      bookedSessions: bookedSessions !== "" ? Number(bookedSessions) : undefined,
+      freeSessions: freeSessions !== "" ? Number(freeSessions) : undefined,
+      depositSessions: depositSessions !== "" ? Number(depositSessions) : undefined,
       status,
       color,
       createdAt: student?.createdAt ?? new Date().toISOString(),
@@ -210,8 +306,33 @@ function StudentModal({
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nhập tên" />
           </div>
           <div>
-            <Label>Giá dạy / giờ (VNĐ) *</Label>
+            <Label>Email học viên</Label>
+            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="example@gmail.com" />
+          </div>
+          <div>
+            <Label>Giá / buổi (VNĐ) *</Label>
             <Input type="number" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="200000" />
+          </div>
+          <div>
+            <Label>Số buổi booking tạm tính</Label>
+            <Input type="number" value={bookedSessions} onChange={(e) => setBookedSessions(e.target.value)} placeholder="Ví dụ: 8" min={0} />
+            <p className="text-xs text-muted-foreground mt-1">Số buổi đã đặt — dùng để tính số buổi còn lại</p>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Số buổi khuyến mại</Label>
+              <Input type="number" value={freeSessions} onChange={(e) => setFreeSessions(e.target.value)} placeholder="0" min={0} />
+              <p className="text-xs text-muted-foreground mt-1">Không tính tiền, cộng vào tổng buổi</p>
+            </div>
+            <div>
+              <Label>Số buổi cần đặt cọc</Label>
+              <Input type="number" value={depositSessions} onChange={(e) => setDepositSessions(e.target.value)} placeholder="0" min={0} />
+              {depositAmount !== null && depositAmount > 0 ? (
+                <p className="text-xs text-amber-600 font-medium mt-1">≈ {formatVND(depositAmount)}</p>
+              ) : (
+                <p className="text-xs text-muted-foreground mt-1">Số tiền sẽ hiện khi nhập</p>
+              )}
+            </div>
           </div>
           <div>
             <Label>Trạng thái</Label>
@@ -233,7 +354,7 @@ function StudentModal({
               </Button>
             </div>
             <div className="flex flex-wrap gap-1.5 mt-3">
-              {TIER1_COLORS.slice(0, 24).map((c) => (
+              {TIER1_COLORS.slice(0, 48).map((c) => (
                 <button
                   key={c}
                   type="button"

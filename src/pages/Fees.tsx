@@ -1,12 +1,16 @@
 import { useState } from "react";
 import { useAppStore } from "@/components/Layout";
 import { uuid, formatVND, formatDate } from "@/lib/helpers";
+import { sendReceiptEmail } from "@/lib/email";
+import { EMAILJS_PUBLIC_KEY } from "@/lib/emailConfig";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Trash2 } from "lucide-react";
+import { Trash2, Mail, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+
+const EMAIL_CONFIGURED = EMAILJS_PUBLIC_KEY !== "YOUR_PUBLIC_KEY";
 
 export default function FeesPage() {
   const { data, addPayment, deletePayment } = useAppStore();
@@ -16,8 +20,10 @@ export default function FeesPage() {
   const [note, setNote] = useState("");
   const [filterStudent, setFilterStudent] = useState("all");
   const [filterMonth, setFilterMonth] = useState("all");
+  const [nameSearch, setNameSearch] = useState("");
+  const [sendingEmail, setSendingEmail] = useState(false);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!studentId || !amount) return;
     addPayment({
       id: uuid(),
@@ -27,6 +33,29 @@ export default function FeesPage() {
       note,
     });
     toast.success("Đã ghi nhận thanh toán");
+
+    // Gửi biên lai qua email nếu học viên có email và EmailJS đã cấu hình
+    const student = data.students.find((s) => s.id === studentId);
+    if (student?.email && EMAIL_CONFIGURED) {
+      setSendingEmail(true);
+      try {
+        await sendReceiptEmail({
+          studentEmail: student.email,
+          studentName: student.name,
+          amount: Number(amount),
+          date,
+          note,
+        });
+        toast.success(`Đã gửi biên lai tới ${student.email}`, {
+          icon: <Mail className="w-4 h-4" />,
+        });
+      } catch {
+        toast.error("Gửi email thất bại. Kiểm tra lại API key trong emailConfig.ts");
+      } finally {
+        setSendingEmail(false);
+      }
+    }
+
     setAmount("");
     setNote("");
   };
@@ -36,6 +65,11 @@ export default function FeesPage() {
     .filter((p) => {
       if (filterMonth === "all") return true;
       return p.date.slice(0, 7) === filterMonth;
+    })
+    .filter((p) => {
+      if (!nameSearch.trim()) return true;
+      const student = data.students.find((s) => s.id === p.studentId);
+      return student?.name.toLowerCase().includes(nameSearch.toLowerCase());
     })
     .sort((a, b) => b.date.localeCompare(a.date));
 
@@ -73,15 +107,21 @@ export default function FeesPage() {
             <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ghi chú..." />
           </div>
         </div>
-        <Button className="mt-4" onClick={handleSubmit} disabled={!studentId || !amount}>
-          Ghi nhận
+        <Button className="mt-4 gap-2" onClick={handleSubmit} disabled={!studentId || !amount || sendingEmail}>
+          {sendingEmail ? <><Loader2 className="w-4 h-4 animate-spin" /> Đang gửi email...</> : "Ghi nhận"}
         </Button>
       </div>
 
       {/* Payment history */}
       <div>
-        <div className="flex items-center gap-3 mb-4">
+        <div className="flex items-center gap-3 mb-4 flex-wrap">
           <h3 className="font-semibold">Lịch sử thanh toán</h3>
+          <Input
+            value={nameSearch}
+            onChange={(e) => setNameSearch(e.target.value)}
+            placeholder="Tìm theo tên..."
+            className="w-40 h-8 text-sm"
+          />
           <Select value={filterStudent} onValueChange={setFilterStudent}>
             <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
             <SelectContent>

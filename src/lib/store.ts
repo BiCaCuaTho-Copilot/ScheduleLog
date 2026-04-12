@@ -1,9 +1,19 @@
 import { useState, useEffect, useCallback } from "react";
 
+export interface PriceChange {
+  effectiveFrom: string; // YYYY-MM-DD
+  price: number;
+}
+
 export interface Student {
   id: string;
   name: string;
+  email?: string;
   pricePerHour: number;
+  priceHistory?: PriceChange[]; // lịch sử thay đổi giá, thứ tự tăng dần
+  bookedSessions?: number;
+  freeSessions?: number;
+  depositSessions?: number;
   status: "active" | "inactive";
   color: string;
   createdAt: string;
@@ -75,10 +85,24 @@ export function useStore() {
   }, [updateData]);
 
   const updateStudent = useCallback((s: Student) => {
-    updateData((d) => ({
-      ...d,
-      students: d.students.map((x) => (x.id === s.id ? s : x)),
-    }));
+    updateData((d) => {
+      const old = d.students.find((x) => x.id === s.id);
+      if (old && old.pricePerHour !== s.pricePerHour) {
+        const today = new Date().toISOString().slice(0, 10);
+        const existingHistory: PriceChange[] = old.priceHistory ?? [
+          { effectiveFrom: old.createdAt.slice(0, 10), price: old.pricePerHour },
+        ];
+        const updated: Student = {
+          ...s,
+          priceHistory: [
+            ...existingHistory.filter((e) => e.effectiveFrom !== today),
+            { effectiveFrom: today, price: s.pricePerHour },
+          ],
+        };
+        return { ...d, students: d.students.map((x) => (x.id === s.id ? updated : x)) };
+      }
+      return { ...d, students: d.students.map((x) => (x.id === s.id ? s : x)) };
+    });
   }, [updateData]);
 
   const deleteStudent = useCallback((id: string) => {

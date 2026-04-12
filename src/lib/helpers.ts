@@ -1,3 +1,5 @@
+import type { Student } from "@/lib/store";
+
 // UUID
 export function uuid(): string {
   return crypto.randomUUID?.() ?? Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -54,18 +56,39 @@ export function toDateStr(date: Date): string {
 export const DAY_NAMES = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
 
 // Hours range for schedule
-export const HOURS = Array.from({ length: 16 }, (_, i) => i + 6); // 6:00 - 21:00
+export const HOURS = Array.from({ length: 19 }, (_, i) => i + 5); // 5:00 - 23:00
 
-// Color palette Tier 1
+// Color palette
 export const TIER1_COLORS = [
-  "#6c63ff", "#4f46e5", "#3b82f6", "#2563eb", "#1d4ed8", "#0ea5e9",
-  "#06b6d4", "#0891b2", "#8b5cf6", "#7c3aed", "#6d28d9", "#a78bfa",
-  "#22c55e", "#16a34a", "#15803d", "#10b981", "#059669", "#047857",
-  "#14b8a6", "#0d9488", "#0f766e", "#84cc16", "#65a30d", "#4d7c0f",
-  "#ef4444", "#dc2626", "#b91c1c", "#f97316", "#ea580c", "#c2410c",
-  "#f59e0b", "#d97706", "#b45309", "#eab308", "#ca8a04", "#a16207",
-  "#ec4899", "#db2777", "#be185d", "#a855f7", "#9333ea", "#7e22ce",
-  "#f43f5e", "#e11d48", "#be123c", "#d946ef", "#c026d3", "#a21caf",
+  // Blues
+  "#3b82f6", "#2563eb", "#1d4ed8", "#60a5fa", "#93c5fd", "#1e40af",
+  // Indigos
+  "#6366f1", "#4f46e5", "#4338ca", "#818cf8", "#6c63ff", "#a5b4fc",
+  // Purples
+  "#8b5cf6", "#7c3aed", "#6d28d9", "#a78bfa", "#c4b5fd", "#5b21b6",
+  // Violets / Fuchsia
+  "#9333ea", "#7e22ce", "#d946ef", "#c026d3", "#a21caf", "#e879f9",
+  // Pinks / Rose
+  "#ec4899", "#db2777", "#be185d", "#f472b6", "#f43f5e", "#e11d48",
+  "#be123c", "#fb7185", "#fda4af",
+  // Reds / Oranges
+  "#ef4444", "#dc2626", "#b91c1c", "#f87171", "#f97316", "#ea580c",
+  "#c2410c", "#fb923c", "#fdba74",
+  // Ambers / Yellows
+  "#f59e0b", "#d97706", "#b45309", "#fbbf24", "#eab308", "#ca8a04",
+  "#a16207", "#fde047",
+  // Limes / Greens
+  "#84cc16", "#65a30d", "#4d7c0f", "#a3e635", "#22c55e", "#16a34a",
+  "#15803d", "#4ade80", "#86efac",
+  // Emeralds / Teals
+  "#10b981", "#059669", "#047857", "#34d399", "#14b8a6", "#0d9488",
+  "#0f766e", "#2dd4bf", "#5eead4",
+  // Cyans / Sky
+  "#06b6d4", "#0891b2", "#0e7490", "#22d3ee", "#0ea5e9", "#0284c7",
+  "#0369a1", "#38bdf8", "#7dd3fc",
+  // Slate / Neutral-colored (distinctive)
+  "#64748b", "#475569", "#334155", "#94a3b8",
+  "#78716c", "#57534e", "#44403c", "#a8a29e",
 ];
 
 // Get next available color
@@ -100,6 +123,19 @@ export function getTextColor(hex: string): string {
   const b = parseInt(hex.slice(5, 7), 16);
   const brightness = r * 0.299 + g * 0.587 + b * 0.114;
   return brightness > 160 ? "#1e1b4b" : "#ffffff";
+}
+
+// Get student's effective price at a given date (dựa vào priceHistory)
+export function getPriceAtDate(student: Student, date: string): number {
+  const history = student.priceHistory;
+  if (!history || history.length === 0) return student.pricePerHour;
+  const sorted = [...history].sort((a, b) => a.effectiveFrom.localeCompare(b.effectiveFrom));
+  let price = sorted[0].price;
+  for (const entry of sorted) {
+    if (entry.effectiveFrom <= date) price = entry.price;
+    else break;
+  }
+  return price;
 }
 
 // Check session overlap

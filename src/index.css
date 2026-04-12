@@ -106,8 +106,6 @@
   padding: 4px 8px;
   font-size: 0.75rem;
   cursor: pointer;
-  position: relative;
-  margin: 2px;
   transition: box-shadow 0.15s;
 }
 .session-block:hover {

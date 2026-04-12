@@ -27,7 +27,7 @@ function SidebarNav() {
       <div className="p-5 border-b border-sidebar-border">
         <h1 className="text-lg font-bold text-sidebar-primary-foreground flex items-center gap-2">
           <CalendarDays className="w-5 h-5 text-sidebar-primary" />
-          <span>TeachFlow</span>
+          <span>PT Studio</span>
         </h1>
       </div>
       <nav className="flex-1 p-3 space-y-1">
