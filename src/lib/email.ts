@@ -1,15 +1,16 @@
 import emailjs from "@emailjs/browser";
-import { EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, EMAILJS_PUBLIC_KEY, TEACHER_NAME } from "./emailConfig";
 import { formatVND, formatDate } from "./helpers";
 
 export function buildReceiptHTML(params: {
   studentName: string;
+  teacherName: string;
+  studioName: string;
   amount: number;
   date: string;
   note: string;
   sessions?: { date: string; hours: number; fee: number }[];
 }): string {
-  const { studentName, amount, date, note, sessions = [] } = params;
+  const { studentName, teacherName, studioName, amount, date, note, sessions = [] } = params;
 
   // Tạo mã đơn hàng từ ngày
   const orderId = "#HF-" + date.replace(/-/g, "");
@@ -34,7 +35,7 @@ export function buildReceiptHTML(params: {
               <tr>
                 <td style="padding:14px 0; border-bottom:1px solid #E8DFC8;">
                   <p style="font-family:Arial,sans-serif; font-size:14px; color:#2C2415; font-weight:bold; margin:0;">Học phí tháng ${date.slice(0, 7).replace("-", "/")}</p>
-                  <p style="font-family:Arial,sans-serif; font-size:12px; color:#7A6E5A; margin:3px 0 0;">Giảng viên: Tuấn</p>
+                  <p style="font-family:Arial,sans-serif; font-size:12px; color:#7A6E5A; margin:3px 0 0;">Giảng viên: ${teacherName}</p>
                 </td>
                 <td align="right" valign="top" style="padding:14px 0 14px 12px; border-bottom:1px solid #E8DFC8; font-family:Arial,sans-serif; font-size:14px; color:#7A6E5A; white-space:nowrap;">×1</td>
                 <td align="right" valign="top" style="padding:14px 0 14px 12px; border-bottom:1px solid #E8DFC8; font-family:Arial,sans-serif; font-size:14px; color:#2C2415; white-space:nowrap;">${formatVND(amount)}</td>
@@ -109,7 +110,7 @@ export function buildReceiptHTML(params: {
             <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:28px; padding-bottom:20px; border-bottom:1px dashed #E8DFC8;">
               <tr>
                 <td>
-                  <p style="font-family: Georgia, serif; font-size:20px; color:#2C2415; font-weight:bold; margin:0;">TUAN PT STUDIO</p>
+                  <p style="font-family: Georgia, serif; font-size:20px; color:#2C2415; font-weight:bold; margin:0;">${studioName.toUpperCase()}</p>
                   <p style="font-family: Arial, sans-serif; font-size:12px; color:#7A6E5A; margin:3px 0 0;">Hoá đơn điện tử</p>
                 </td>
                 <td align="right" valign="top">
@@ -139,7 +140,7 @@ export function buildReceiptHTML(params: {
                 </td>
                 <td width="50%">
                   <p style="font-family:Arial,sans-serif; font-size:10px; color:#7A6E5A; text-transform:uppercase; letter-spacing:1px; margin:0 0 3px;">Giảng viên</p>
-                  <p style="font-family:Arial,sans-serif; font-size:14px; color:#2C2415; font-weight:bold; margin:0;">Tuấn</p>
+                  <p style="font-family:Arial,sans-serif; font-size:14px; color:#2C2415; font-weight:bold; margin:0;">${teacherName}</p>
                 </td>
               </tr>
             </table>
@@ -203,15 +204,27 @@ export function buildReceiptHTML(params: {
 export async function sendReceiptEmail(params: {
   studentEmail: string;
   studentName: string;
+  teacherName: string;
+  studioName: string;
   amount: number;
   date: string;
   note: string;
+  emailjsServiceId: string;
+  emailjsTemplateId: string;
+  emailjsPublicKey: string;
 }): Promise<void> {
-  const html = buildReceiptHTML(params);
+  const html = buildReceiptHTML({
+    studentName: params.studentName,
+    teacherName: params.teacherName,
+    studioName: params.studioName,
+    amount: params.amount,
+    date: params.date,
+    note: params.note,
+  });
 
   await emailjs.send(
-    EMAILJS_SERVICE_ID,
-    EMAILJS_TEMPLATE_ID,
+    params.emailjsServiceId,
+    params.emailjsTemplateId,
     {
       email: params.studentEmail,
       student_name: params.studentName,
@@ -220,6 +233,6 @@ export async function sendReceiptEmail(params: {
       note: params.note || "—",
       html_content: html,
     },
-    EMAILJS_PUBLIC_KEY,
+    params.emailjsPublicKey,
   );
 }

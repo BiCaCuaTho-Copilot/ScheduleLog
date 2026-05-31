@@ -14,6 +14,7 @@ export interface Student {
   bookedSessions?: number;
   freeSessions?: number;
   depositSessions?: number;
+  previousDebt?: number;
   status: "active" | "inactive";
   color: string;
   createdAt: string;
@@ -118,6 +119,10 @@ export function useStore() {
     updateData((d) => ({ ...d, sessions: [...d.sessions, s] }));
   }, [updateData]);
 
+  const addSessions = useCallback((list: Session[]) => {
+    updateData((d) => ({ ...d, sessions: [...d.sessions, ...list] }));
+  }, [updateData]);
+
   const updateSession = useCallback((s: Session) => {
     updateData((d) => ({
       ...d,
@@ -152,7 +157,7 @@ export function useStore() {
   return {
     data,
     addStudent, updateStudent, deleteStudent,
-    addSession, updateSession, deleteSession,
+    addSession, addSessions, updateSession, deleteSession,
     addPayment, deletePayment,
     clearAll,
   };

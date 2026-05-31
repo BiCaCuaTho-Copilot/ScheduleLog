@@ -1,9 +1,10 @@
 import React, { createContext, useContext } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useStore } from "@/lib/store";
+import { useConfig } from "@/lib/config";
 import { Users, CalendarDays, CreditCard, BarChart3, Settings } from "lucide-react";
 
-type StoreReturn = ReturnType<typeof useStore>;
+type StoreReturn = ReturnType<typeof useStore> & ReturnType<typeof useConfig>;
 const StoreContext = createContext<StoreReturn | null>(null);
 
 export function useAppStore(): StoreReturn {
@@ -22,12 +23,13 @@ const navItems = [
 
 function SidebarNav() {
   const location = useLocation();
+  const { config } = useAppStore();
   return (
     <aside className="fixed left-0 top-0 bottom-0 w-56 bg-sidebar flex flex-col z-30">
       <div className="p-5 border-b border-sidebar-border">
         <h1 className="text-lg font-bold text-sidebar-primary-foreground flex items-center gap-2">
           <CalendarDays className="w-5 h-5 text-sidebar-primary" />
-          <span>PT Studio</span>
+          <span>{config.studioName}</span>
         </h1>
       </div>
       <nav className="flex-1 p-3 space-y-1">
@@ -58,8 +60,9 @@ function SidebarNav() {
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const store = useStore();
+  const configStore = useConfig();
   return (
-    <StoreContext.Provider value={store}>
+    <StoreContext.Provider value={{ ...store, ...configStore }}>
       <div className="min-h-screen">
         <SidebarNav />
         <main className="ml-56 min-h-screen">

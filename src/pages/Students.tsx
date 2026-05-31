@@ -19,16 +19,14 @@ export default function StudentsPage() {
   const [search, setSearch] = useState("");
 
   const getDebt = (studentId: string) => {
+    const st = data.students.find((x) => x.id === studentId);
     const totalFee = data.sessions
       .filter((s) => s.studentId === studentId && s.attended)
-      .reduce((sum, s) => {
-        const st = data.students.find((x) => x.id === studentId);
-        return sum + (st?.pricePerHour ?? 0);
-      }, 0);
+      .reduce((sum) => sum + (st?.pricePerHour ?? 0), 0);
     const totalPaid = data.payments
       .filter((p) => p.studentId === studentId)
       .reduce((sum, p) => sum + p.amount, 0);
-    return Math.max(0, totalFee - totalPaid);
+    return Math.max(0, totalFee + (st?.previousDebt ?? 0) - totalPaid);
   };
 
   const todayStr = new Date().toISOString().slice(0, 10);
@@ -152,6 +150,12 @@ export default function StudentsPage() {
                       <span className="font-medium">{formatVND(totalFee)}</span>
                     </div>
                   )}
+                  {s.previousDebt != null && s.previousDebt > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Nợ trước đó</span>
+                      <span className="font-medium text-destructive">{formatVND(s.previousDebt)}</span>
+                    </div>
+                  )}
                   {depositAmount !== null && (
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Đặt cọc ({s.depositSessions} buổi)</span>
@@ -243,6 +247,7 @@ function StudentModal({
   const [bookedSessions, setBookedSessions] = useState("");
   const [freeSessions, setFreeSessions] = useState("");
   const [depositSessions, setDepositSessions] = useState("");
+  const [previousDebt, setPreviousDebt] = useState("");
   const [status, setStatus] = useState<"active" | "inactive">("active");
   const [color, setColor] = useState("#6c63ff");
 
@@ -256,6 +261,7 @@ function StudentModal({
       setBookedSessions(student.bookedSessions != null ? String(student.bookedSessions) : "");
       setFreeSessions(student.freeSessions != null ? String(student.freeSessions) : "");
       setDepositSessions(student.depositSessions != null ? String(student.depositSessions) : "");
+      setPreviousDebt(student.previousDebt != null ? String(student.previousDebt) : "");
       setStatus(student.status);
       setColor(student.color);
     } else {
@@ -265,6 +271,7 @@ function StudentModal({
       setBookedSessions("");
       setFreeSessions("");
       setDepositSessions("");
+      setPreviousDebt("");
       setStatus("active");
       setColor(getNextColor(usedColors));
     }
@@ -288,6 +295,7 @@ function StudentModal({
       bookedSessions: bookedSessions !== "" ? Number(bookedSessions) : undefined,
       freeSessions: freeSessions !== "" ? Number(freeSessions) : undefined,
       depositSessions: depositSessions !== "" ? Number(depositSessions) : undefined,
+      previousDebt: previousDebt !== "" ? Number(previousDebt) : undefined,
       status,
       color,
       createdAt: student?.createdAt ?? new Date().toISOString(),
@@ -333,6 +341,11 @@ function StudentModal({
                 <p className="text-xs text-muted-foreground mt-1">Số tiền sẽ hiện khi nhập</p>
               )}
             </div>
+          </div>
+          <div>
+            <Label>Nợ trước đó (VNĐ)</Label>
+            <Input type="number" value={previousDebt} onChange={(e) => setPreviousDebt(e.target.value)} placeholder="0" min={0} />
+            <p className="text-xs text-muted-foreground mt-1">Số tiền học viên còn thiếu trước khi nhập học</p>
           </div>
           <div>
             <Label>Trạng thái</Label>

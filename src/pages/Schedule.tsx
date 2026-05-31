@@ -5,14 +5,14 @@ import {
   useSensor, useSensors, MouseSensor, TouchSensor,
   type DragEndEvent, type DragStartEvent,
 } from "@dnd-kit/core";
-import { uuid, getTextColor, hasOverlap, getMonday, getWeekDays, toDateStr, getISOWeek, DAY_NAMES, HOURS, formatVND } from "@/lib/helpers";
+import { uuid, getTextColor, hasOverlap, getMonday, getWeekDays, toDateStr, getISOWeek, DAY_NAMES, formatVND } from "@/lib/helpers";
 import type { Session, Student } from "@/lib/store";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ChevronLeft, ChevronRight, FileDown, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileDown, Copy, X } from "lucide-react";
 import { toast } from "sonner";
 
 function formatHour(h: number): string {
@@ -55,12 +55,13 @@ function layoutSessions(sessions: Session[]): { sess: Session; col: number; numC
 }
 
 export default function SchedulePage() {
-  const { data, addSession, updateSession, deleteSession } = useAppStore();
+  const { data, addSession, updateSession, deleteSession, config } = useAppStore();
   const [currentMonday, setCurrentMonday] = useState(() => getMonday(new Date()));
   const [dragStudentId, setDragStudentId] = useState<string | null>(null);
   const [dragSessionId, setDragSessionId] = useState<string | null>(null);
   const [editSession, setEditSession] = useState<Session | null>(null);
   const [conflictFlash, setConflictFlash] = useState<string | null>(null);
+  const [copyModalOpen, setCopyModalOpen] = useState(false);
   const [studentSearch, setStudentSearch] = useState("");
   // grab offset: where within the session block the user clicked (px from top of block)
   const grabOffsetRef = useRef(0);
@@ -120,8 +121,12 @@ export default function SchedulePage() {
 
   const HOUR_HEIGHT = 60; // px per hour
   const SLOT_HEIGHT = 30; // px per 30-min slot
-  const FIRST_HOUR = HOURS[0];
-  const HALF_HOURS = HOURS.flatMap((h) => [h, h + 0.5]);
+  const SCHEDULE_HOURS = Array.from(
+    { length: config.schedule.endHour - config.schedule.startHour + 1 },
+    (_, i) => i + config.schedule.startHour,
+  );
+  const FIRST_HOUR = SCHEDULE_HOURS[0];
+  const HALF_HOURS = SCHEDULE_HOURS.flatMap((h) => [h, h + 0.5]);
 
   const handleDragStart = (e: DragStartEvent) => {
     const id = e.active.id as string;
@@ -181,7 +186,7 @@ export default function SchedulePage() {
       // ── Create new session from student drag ──
       const studentId = activeId;
       const newSession: Session = {
-        id: uuid(), studentId, date, startHour, duration: 2, attended: true, note: "",
+        id: uuid(), studentId, date, startHour, duration: config.schedule.defaultDuration, attended: config.schedule.defaultAttended, note: "",
       };
       const conflictId = hasOverlap(data.sessions, newSession);
       if (conflictId) {
@@ -337,6 +342,9 @@ h1{text-align:center;margin-bottom:16px;font-size:20px;font-weight:700;color:#1e
             />
             <Button variant="outline" size="sm" onClick={goToday}>Hôm nay</Button>
             <div className="flex-1" />
+            <Button variant="outline" size="sm" onClick={() => setCopyModalOpen(true)} className="gap-1">
+              <Copy className="w-3.5 h-3.5" /> Copy lịch
+            </Button>
             <Button variant="outline" size="sm" onClick={exportHTML} className="gap-1">
               <FileDown className="w-3.5 h-3.5" /> Xuất lịch học
             </Button>
@@ -467,6 +475,13 @@ h1{text-align:center;margin-bottom:16px;font-size:20px;font-weight:700;color:#1e
         })() : null}
       </DragOverlay>
 
+      {/* Copy schedule modal */}
+      <CopyScheduleModal
+        open={copyModalOpen}
+        onClose={() => setCopyModalOpen(false)}
+        initialWeekDate={toDateStr(currentMonday)}
+      />
+
       {/* Edit session modal */}
       {editSession && (
         <SessionEditModal
@@ -575,6 +590,201 @@ function DroppableCell({ id, isToday, isHalf }: { id: string; isToday: boolean; 
       style={{ height: 30 }}
       className={`border-r ${isHalf ? "border-b border-dashed opacity-60" : "border-b"} ${isToday ? "bg-primary/[0.04]" : ""} ${isOver ? "bg-primary/10" : ""}`}
     />
+  );
+}
+
+function CopyScheduleModal({
+  open, onClose, initialWeekDate,
+}: {
+  open: boolean;
+  onClose: () => void;
+  initialWeekDate: string;
+}) {
+  const { data, addSessions } = useAppStore();
+  const [sourceDate, setSourceDate] = useState(initialWeekDate);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (open) { setSourceDate(initialWeekDate); setSelected(new Set()); }
+  }, [open, initialWeekDate]);
+
+  const sourceMonday = useMemo(() => getMonday(new Date(sourceDate + "T12:00:00")), [sourceDate]);
+  const sourceDays   = useMemo(() => getWeekDays(sourceMonday), [sourceMonday]);
+  const sourceWeekNum = getISOWeek(sourceMonday);
+  const sourceYear    = sourceMonday.getFullYear();
+
+  const sourceSessions = useMemo(() => {
+    const start = toDateStr(sourceDays[0]);
+    const end   = toDateStr(sourceDays[6]);
+    return data.sessions
+      .filter((s) => s.date >= start && s.date <= end)
+      .sort((a, b) => a.date.localeCompare(b.date) || a.startHour - b.startHour);
+  }, [data.sessions, sourceDays]);
+
+  // 12 tuần tiếp theo sau tuần nguồn
+  const candidateWeeks = useMemo(() =>
+    Array.from({ length: 12 }, (_, i) => {
+      const d = new Date(sourceMonday);
+      d.setDate(d.getDate() + (i + 1) * 7);
+      return d;
+    }), [sourceMonday]);
+
+  const weekInfos = useMemo(() => {
+    return candidateWeeks.map((targetMonday) => {
+      const days      = getWeekDays(targetMonday);
+      const startStr  = toDateStr(days[0]);
+      const endStr    = toDateStr(days[6]);
+      const offsetMs  = targetMonday.getTime() - sourceMonday.getTime();
+      const offsetDays = Math.round(offsetMs / 86400000);
+
+      const projected = sourceSessions.map((sess) => {
+        const d = new Date(sess.date + "T12:00:00");
+        d.setDate(d.getDate() + offsetDays);
+        return { ...sess, id: `__tmp_${sess.id}`, date: toDateStr(d) };
+      });
+
+      const conflictCount = projected.filter(
+        (ps) => hasOverlap(data.sessions, ps) !== null
+      ).length;
+
+      const existingCount = data.sessions.filter(
+        (s) => s.date >= startStr && s.date <= endStr
+      ).length;
+
+      const mondayStr = toDateStr(targetMonday);
+      return {
+        mondayStr, weekNum: getISOWeek(targetMonday),
+        year: targetMonday.getFullYear(),
+        startStr, endStr, offsetDays,
+        existingCount, conflictCount,
+      };
+    });
+  }, [candidateWeeks, sourceSessions, data.sessions, sourceMonday]);
+
+  const toggle = (mondayStr: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.has(mondayStr) ? next.delete(mondayStr) : next.add(mondayStr);
+      return next;
+    });
+
+  const selectedInfos = weekInfos.filter((w) => selected.has(w.mondayStr));
+  const totalConflicts = selectedInfos.reduce((s, w) => s + w.conflictCount, 0);
+  const totalWillCreate = selectedInfos.length * sourceSessions.length - totalConflicts;
+
+  const handleApply = () => {
+    const newSessions: Session[] = [];
+    for (const info of selectedInfos) {
+      for (const sess of sourceSessions) {
+        const d = new Date(sess.date + "T12:00:00");
+        d.setDate(d.getDate() + info.offsetDays);
+        const newSess: Session = { ...sess, id: uuid(), date: toDateStr(d) };
+        if (hasOverlap(data.sessions, newSess) === null) newSessions.push(newSess);
+      }
+    }
+    addSessions(newSessions);
+    toast.success(`Đã tạo ${newSessions.length} buổi học cho ${selectedInfos.length} tuần`);
+    onClose();
+  };
+
+  const fmtDay = (str: string) => {
+    const d = new Date(str + "T12:00:00");
+    return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Copy lịch sang tuần khác</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 pt-1">
+          {/* Source */}
+          <div>
+            <Label className="text-xs">Tuần nguồn (copy từ)</Label>
+            <Input type="date" value={sourceDate} onChange={(e) => setSourceDate(e.target.value)} className="mt-1" />
+            <p className="text-xs text-muted-foreground mt-1">
+              Tuần {sourceWeekNum} — {sourceYear} · <span className="font-medium">{sourceSessions.length} buổi học</span>
+            </p>
+          </div>
+
+          {/* Source sessions preview */}
+          {sourceSessions.length > 0 ? (
+            <div className="bg-muted/30 rounded-md p-2 space-y-1 max-h-28 overflow-y-auto">
+              {sourceSessions.map((sess) => {
+                const student = data.students.find((s) => s.id === sess.studentId);
+                const dow = new Date(sess.date + "T12:00:00").getDay();
+                return (
+                  <div key={sess.id} className="flex items-center gap-2 text-xs">
+                    <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: student?.color }} />
+                    <span className="text-muted-foreground w-5">{DAY_NAMES[dow === 0 ? 6 : dow - 1]}</span>
+                    <span className="font-medium">{student?.name}</span>
+                    <span className="text-muted-foreground ml-auto">{formatHour(sess.startHour)} · {sess.duration}h</span>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground text-center py-2 border rounded-md">Tuần này chưa có lịch học</p>
+          )}
+
+          {/* Target weeks */}
+          <div>
+            <Label className="text-xs">Chọn tuần muốn dán vào</Label>
+            <div className="mt-1 border rounded-md divide-y max-h-52 overflow-y-auto">
+              {weekInfos.map((info) => {
+                const isSelected = selected.has(info.mondayStr);
+                return (
+                  <label
+                    key={info.mondayStr}
+                    className={`flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-muted/50 transition-colors ${isSelected ? "bg-primary/5" : ""}`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggle(info.mondayStr)}
+                      className="accent-primary"
+                    />
+                    <span className="text-sm flex-1">
+                      <span className="font-medium">Tuần {info.weekNum}</span>
+                      <span className="text-muted-foreground ml-2 text-xs">{fmtDay(info.startStr)} → {fmtDay(info.endStr)}</span>
+                    </span>
+                    {info.conflictCount > 0 && (
+                      <span className="text-xs text-amber-600 font-medium">⚠️ {info.conflictCount} trùng</span>
+                    )}
+                    {info.existingCount > 0 && info.conflictCount === 0 && (
+                      <span className="text-xs text-muted-foreground">{info.existingCount} buổi có sẵn</span>
+                    )}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Summary */}
+          {selected.size > 0 && (
+            <div className="bg-primary/5 rounded-md px-3 py-2 text-xs">
+              <span className="font-medium">{selected.size} tuần</span> đã chọn ·{" "}
+              <span className="font-medium text-success">{totalWillCreate} buổi</span> sẽ được tạo
+              {totalConflicts > 0 && (
+                <span className="text-amber-600"> · {totalConflicts} bỏ qua do trùng lịch</span>
+              )}
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={onClose}>Huỷ</Button>
+            <Button
+              size="sm"
+              disabled={selected.size === 0 || sourceSessions.length === 0 || totalWillCreate === 0}
+              onClick={handleApply}
+            >
+              Áp dụng {selected.size > 0 ? `(${totalWillCreate} buổi)` : ""}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

@@ -93,7 +93,7 @@ function SummaryCards({ totalFee, totalPaid, debt, overpaid }: { totalFee: numbe
   );
 }
 
-type StudentRow = { name: string; color: string; sessions: number; hours: number; fee: number; paid: number; balance: number; depositAmount: number; pricePerHour: number };
+type StudentRow = { name: string; color: string; sessions: number; hours: number; fee: number; paid: number; balance: number; pricePerHour: number };
 
 function equivText(amount: number, pricePerSession: number) {
   if (pricePerSession <= 0) return "";
@@ -131,7 +131,7 @@ function StudentTable({ rows }: { rows: StudentRow[] }) {
                 <td className="p-3 text-right">{formatVND(r.fee)}</td>
                 <td className="p-3 text-right text-success">{formatVND(r.paid)}</td>
                 <td className="p-3 text-right font-medium text-destructive">
-                  {shortage > 0 ? `Thiếu cọc ${formatVND(shortage)}` : "—"}
+                  {shortage > 0 ? formatVND(shortage) : "—"}
                 </td>
                 <td className="p-3 text-right font-medium text-blue-500">
                   {over > 0 ? (
@@ -170,8 +170,7 @@ function WeekStats() {
       const paid = data.payments
         .filter((p) => p.studentId === s.id && p.date >= startDate && p.date <= endDate)
         .reduce((sum, p) => sum + p.amount, 0);
-      const depositAmount = (s.depositSessions ?? 0) * s.pricePerHour;
-      return { name: s.name, color: s.color, sessions: sessions.length, hours, fee, paid, balance: paid - depositAmount, depositAmount, pricePerHour: s.pricePerHour };
+      return { name: s.name, color: s.color, sessions: sessions.length, hours, fee, paid, balance: paid - fee, pricePerHour: s.pricePerHour };
     }).filter((r) => r.sessions > 0 || r.paid > 0);
   }, [data, startDate, endDate]);
 
@@ -222,8 +221,7 @@ function MonthStats() {
       const paid = data.payments
         .filter((p) => p.studentId === s.id && p.date.startsWith(monthStr))
         .reduce((sum, p) => sum + p.amount, 0);
-      const depositAmount = (s.depositSessions ?? 0) * s.pricePerHour;
-      return { name: s.name, color: s.color, sessions: sessions.length, hours, fee, paid, balance: paid - depositAmount, depositAmount, pricePerHour: s.pricePerHour };
+      return { name: s.name, color: s.color, sessions: sessions.length, hours, fee, paid, balance: paid - fee, pricePerHour: s.pricePerHour };
     }).filter((r) => r.sessions > 0 || r.paid > 0);
   }, [data, monthStr]);
 
@@ -443,18 +441,15 @@ function DebtStats() {
       const attendedFee = allSessions.reduce((sum, sess) => sum + getPriceAtDate(s, sess.date), 0);
       // Buổi booking còn lại (chưa học) × giá hiện tại
       const remainingBooked = Math.max(0, (s.bookedSessions ?? 0) - allSessions.length);
-      const totalFee = attendedFee + remainingBooked * s.pricePerHour;
+      const totalFee = attendedFee + remainingBooked * s.pricePerHour + (s.previousDebt ?? 0);
       const totalPaid = data.payments.filter((p) => p.studentId === s.id).reduce((sum, p) => sum + p.amount, 0);
       const monthFee = allSessions.filter((sess) => sess.date.startsWith(currentMonth)).reduce((sum, sess) => sum + getPriceAtDate(s, sess.date), 0);
       const yearFee = allSessions.filter((sess) => sess.date.startsWith(currentYear)).reduce((sum, sess) => sum + getPriceAtDate(s, sess.date), 0);
-      const depositAmount = (s.depositSessions ?? 0) * s.pricePerHour;
-      const depositBalance = totalPaid - depositAmount;
-      const overpaid = Math.max(0, depositBalance);
-      const debt = Math.max(0, -depositBalance);
+      const debt = Math.max(0, totalFee - totalPaid);
+      const overpaid = Math.max(0, totalPaid - totalFee);
       return {
         name: s.name, color: s.color, totalFee, totalPaid,
         debt, overpaid,
-        isDepositShortage: debt > 0,
         pricePerHour: s.pricePerHour,
         monthFee, yearFee,
       };
@@ -503,7 +498,7 @@ function DebtStats() {
                   <td className="p-3 text-right">{formatVND(r.totalFee)}</td>
                   <td className="p-3 text-right text-success">{formatVND(r.totalPaid)}</td>
                   <td className="p-3 text-right font-medium text-destructive">
-                    {r.isDepositShortage ? `Thiếu cọc ${formatVND(r.debt)}` : "—"}
+                    {r.debt > 0 ? formatVND(r.debt) : "—"}
                   </td>
                   <td className="p-3 text-right font-medium text-blue-500">
                     {r.overpaid > 0 ? (

@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useAppStore } from "@/components/Layout";
 import { uuid, formatVND, formatDate } from "@/lib/helpers";
 import { sendReceiptEmail } from "@/lib/email";
-import { EMAILJS_PUBLIC_KEY } from "@/lib/emailConfig";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,10 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Trash2, Mail, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-const EMAIL_CONFIGURED = EMAILJS_PUBLIC_KEY !== "YOUR_PUBLIC_KEY";
-
 export default function FeesPage() {
-  const { data, addPayment, deletePayment } = useAppStore();
+  const { data, addPayment, deletePayment, config } = useAppStore();
+  const emailConfigured = !!(config.emailjs.publicKey && config.emailjs.serviceId && config.emailjs.templateId);
   const [studentId, setStudentId] = useState("");
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
@@ -36,21 +34,26 @@ export default function FeesPage() {
 
     // Gửi biên lai qua email nếu học viên có email và EmailJS đã cấu hình
     const student = data.students.find((s) => s.id === studentId);
-    if (student?.email && EMAIL_CONFIGURED) {
+    if (student?.email && emailConfigured) {
       setSendingEmail(true);
       try {
         await sendReceiptEmail({
           studentEmail: student.email,
           studentName: student.name,
+          teacherName: config.teacherName,
+          studioName: config.studioName,
           amount: Number(amount),
           date,
           note,
+          emailjsServiceId: config.emailjs.serviceId,
+          emailjsTemplateId: config.emailjs.templateId,
+          emailjsPublicKey: config.emailjs.publicKey,
         });
         toast.success(`Đã gửi biên lai tới ${student.email}`, {
           icon: <Mail className="w-4 h-4" />,
         });
       } catch {
-        toast.error("Gửi email thất bại. Kiểm tra lại API key trong emailConfig.ts");
+        toast.error("Gửi email thất bại. Kiểm tra cấu hình EmailJS trong Cài đặt");
       } finally {
         setSendingEmail(false);
       }
