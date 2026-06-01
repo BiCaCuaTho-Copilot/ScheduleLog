@@ -111,23 +111,28 @@ export function useStore() {
       if (studentsReady && sessionsReady && paymentsReady) setLoading(false);
     };
 
+    const onErr = (e: Error) => {
+      toast.error(`Firestore kết nối thất bại: ${e.message}`);
+      setLoading(false);
+    };
+
     const unsubStudents = onSnapshot(collection(db, "students"), (snap) => {
       setStudents(snap.docs.map((d) => d.data() as Student));
       studentsReady = true;
       checkReady();
-    });
+    }, onErr);
 
     const unsubSessions = onSnapshot(collection(db, "sessions"), (snap) => {
       setSessions(snap.docs.map((d) => d.data() as Session));
       sessionsReady = true;
       checkReady();
-    });
+    }, onErr);
 
     const unsubPayments = onSnapshot(collection(db, "payments"), (snap) => {
       setPayments(snap.docs.map((d) => d.data() as Payment));
       paymentsReady = true;
       checkReady();
-    });
+    }, onErr);
 
     return () => {
       unsubStudents();
