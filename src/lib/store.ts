@@ -146,7 +146,7 @@ export function useStore() {
 
   // ── Students ──────────────────────────────────────────────────────────────
   const addStudent = useCallback((s: Student) => {
-    setDoc(doc(db, "students", s.id), s).catch((e) => handleFirestoreError(e, "addStudent"));
+    setDoc(doc(db, "students", s.id), clean(s)).catch((e) => handleFirestoreError(e, "addStudent"));
   }, []);
 
   const updateStudent = useCallback((s: Student) => {
@@ -163,9 +163,9 @@ export function useStore() {
           { effectiveFrom: today, price: s.pricePerHour },
         ],
       };
-      setDoc(doc(db, "students", s.id), updated).catch((e) => handleFirestoreError(e, "updateStudent"));
+      setDoc(doc(db, "students", s.id), clean(updated)).catch((e) => handleFirestoreError(e, "updateStudent"));
     } else {
-      setDoc(doc(db, "students", s.id), s).catch((e) => handleFirestoreError(e, "updateStudent"));
+      setDoc(doc(db, "students", s.id), clean(s)).catch((e) => handleFirestoreError(e, "updateStudent"));
     }
   }, [students]);
 
@@ -179,17 +179,17 @@ export function useStore() {
 
   // ── Sessions ──────────────────────────────────────────────────────────────
   const addSession = useCallback((s: Session) => {
-    setDoc(doc(db, "sessions", s.id), s).catch((e) => handleFirestoreError(e, "addSession"));
+    setDoc(doc(db, "sessions", s.id), clean(s)).catch((e) => handleFirestoreError(e, "addSession"));
   }, []);
 
   const addSessions = useCallback((list: Session[]) => {
     const batch = writeBatch(db);
-    list.forEach((s) => batch.set(doc(db, "sessions", s.id), s));
+    list.forEach((s) => batch.set(doc(db, "sessions", s.id), clean(s)));
     batch.commit().catch((e) => handleFirestoreError(e, "addSessions"));
   }, []);
 
   const updateSession = useCallback((s: Session) => {
-    setDoc(doc(db, "sessions", s.id), s).catch((e) => handleFirestoreError(e, "updateSession"));
+    setDoc(doc(db, "sessions", s.id), clean(s)).catch((e) => handleFirestoreError(e, "updateSession"));
   }, []);
 
   const deleteSession = useCallback((id: string) => {
@@ -198,7 +198,7 @@ export function useStore() {
 
   // ── Payments ──────────────────────────────────────────────────────────────
   const addPayment = useCallback((p: Payment) => {
-    setDoc(doc(db, "payments", p.id), p).catch((e) => handleFirestoreError(e, "addPayment"));
+    setDoc(doc(db, "payments", p.id), clean(p)).catch((e) => handleFirestoreError(e, "addPayment"));
   }, []);
 
   const deletePayment = useCallback((id: string) => {
