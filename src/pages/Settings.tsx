@@ -1,6 +1,8 @@
 import { useState, useRef } from "react";
 import { useAppStore } from "@/components/Layout";
 import type { AppData } from "@/lib/store";
+import { db } from "@/lib/firebase";
+import { doc, setDoc, writeBatch } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -42,16 +44,19 @@ function BackupSection() {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (ev) => {
+    reader.onload = async (ev) => {
       try {
         const parsed = JSON.parse(ev.target?.result as string) as AppData;
         if (!Array.isArray(parsed.students) || !Array.isArray(parsed.sessions) || !Array.isArray(parsed.payments)) {
           toast.error("File không đúng định dạng backup");
           return;
         }
-        localStorage.setItem("tt_data", JSON.stringify(parsed));
-        toast.success("Khôi phục thành công — trang sẽ tải lại");
-        setTimeout(() => window.location.reload(), 1000);
+        const batch = writeBatch(db);
+        parsed.students.forEach((s) => batch.set(doc(db, "students", s.id), s));
+        parsed.sessions.forEach((s) => batch.set(doc(db, "sessions", s.id), s));
+        parsed.payments.forEach((p) => batch.set(doc(db, "payments", p.id), p));
+        await batch.commit();
+        toast.success("Khôi phục thành công từ backup");
       } catch {
         toast.error("Không đọc được file, kiểm tra lại định dạng JSON");
       }

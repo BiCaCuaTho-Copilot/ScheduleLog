@@ -2,7 +2,7 @@ import React, { createContext, useContext } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useStore } from "@/lib/store";
 import { useConfig } from "@/lib/config";
-import { Users, CalendarDays, CreditCard, BarChart3, Settings } from "lucide-react";
+import { Users, CalendarDays, CreditCard, BarChart3, Settings, Wifi } from "lucide-react";
 
 type StoreReturn = ReturnType<typeof useStore> & ReturnType<typeof useConfig>;
 const StoreContext = createContext<StoreReturn | null>(null);
@@ -51,10 +51,20 @@ function SidebarNav() {
           );
         })}
       </nav>
-      <div className="p-4 text-xs text-sidebar-muted border-t border-sidebar-border">
-        Dữ liệu lưu cục bộ
+      <div className="p-4 text-xs text-sidebar-muted border-t border-sidebar-border flex items-center gap-1.5">
+        <Wifi className="w-3 h-3" />
+        Đồng bộ Firebase
       </div>
     </aside>
+  );
+}
+
+function LoadingScreen() {
+  return (
+    <div className="fixed inset-0 bg-background flex flex-col items-center justify-center gap-4 z-50">
+      <div className="w-12 h-12 rounded-full border-2 border-primary/20 border-t-primary animate-spin" />
+      <p className="text-sm text-muted-foreground">Đang kết nối Firebase...</p>
+    </div>
   );
 }
 
@@ -63,12 +73,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const configStore = useConfig();
   return (
     <StoreContext.Provider value={{ ...store, ...configStore }}>
-      <div className="min-h-screen">
-        <SidebarNav />
-        <main className="ml-56 min-h-screen">
-          {children}
-        </main>
-      </div>
+      {store.loading ? (
+        <LoadingScreen />
+      ) : (
+        <div className="min-h-screen">
+          <SidebarNav />
+          <main className="ml-56 min-h-screen">
+            {children}
+          </main>
+        </div>
+      )}
     </StoreContext.Provider>
   );
 }

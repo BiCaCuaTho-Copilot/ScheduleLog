@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ChevronLeft, ChevronRight, FileDown, Copy, X, ImageDown, Mail } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileDown, Copy, X, ImageDown, Mail, Check, UserX } from "lucide-react";
 import { toast } from "sonner";
 
 function formatHour(h: number): string {
@@ -368,6 +368,10 @@ export default function SchedulePage() {
                           hasConflict={hasOverlap(data.sessions, sess) !== null}
                           onEdit={() => setEditSession(sess)}
                           onDelete={() => { deleteSession(sess.id); toast.success("Đã xoá buổi học"); }}
+                          onCheckIn={() => {
+                            updateSession({ ...sess, checkedIn: true, attended: true });
+                            toast.success(`✓ ${student.name} đã check-in`);
+                          }}
                         />
                       );
                     })}
@@ -472,12 +476,12 @@ function DraggableStudent({ student, remaining, booked }: { student: Student; re
 
 function DraggableSession({
   sess, student, col, numCols, firstHour, hourHeight,
-  isConflicting, hasConflict, onEdit, onDelete,
+  isConflicting, hasConflict, onEdit, onDelete, onCheckIn,
 }: {
   sess: Session; student: Student; col: number; numCols: number;
   firstHour: number; hourHeight: number;
   isConflicting: boolean; hasConflict: boolean;
-  onEdit: () => void; onDelete: () => void;
+  onEdit: () => void; onDelete: () => void; onCheckIn: () => void;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `sess:${sess.id}` });
   const textColor = getTextColor(student.color);
@@ -506,14 +510,33 @@ function DraggableSession({
         opacity: isDragging ? 0.25 : 1,
         cursor: isDragging ? "grabbing" : "grab",
         touchAction: "none",
+        // Viền gold khi đã check-in
+        border: sess.checkedIn ? "2px solid #C9A84C" : "none",
+        boxShadow: sess.checkedIn ? "0 0 8px rgba(201,168,76,0.45)" : undefined,
       }}
       onClick={() => { if (!isDragging) onEdit(); }}
     >
       <div className="flex items-center justify-between gap-1 pointer-events-none">
-        <span className="font-semibold truncate text-xs">● {student.name}</span>
+        <span className="font-semibold truncate text-xs">
+          {sess.checkedIn ? "✓" : "●"} {student.name}
+        </span>
         {hasConflict && <span title="Trùng lịch">⚠️</span>}
       </div>
       <div className="text-xs opacity-80 pointer-events-none">{formatHour(sess.startHour)} · {sess.duration}h</div>
+
+      {/* Nút check-in — hiện khi hover, ẩn khi đã check-in */}
+      {!sess.checkedIn && (
+        <button
+          className="absolute bottom-1 left-1 opacity-0 hover:opacity-100 transition-opacity rounded px-1 py-0.5 flex items-center gap-0.5 text-[10px] font-bold"
+          style={{ backgroundColor: "rgba(201,168,76,0.85)", color: "#0D0D0D" }}
+          onClick={(e) => { e.stopPropagation(); onCheckIn(); }}
+          title="Check-in"
+        >
+          <Check className="w-2.5 h-2.5" /> In
+        </button>
+      )}
+
+      {/* Nút xoá */}
       <button
         className="absolute top-1 right-1 opacity-0 hover:opacity-100 transition-opacity"
         style={{ color: textColor }}
@@ -862,64 +885,114 @@ function SessionEditModal({
   const [startHour, setStartHour] = useState(session.startHour);
   const [duration, setDuration] = useState(session.duration);
   const [attended, setAttended] = useState(session.attended);
+  const [checkedIn, setCheckedIn] = useState(session.checkedIn ?? false);
   const [note, setNote] = useState(session.note);
+  const [confirmOff, setConfirmOff] = useState(false);
 
   const student = students.find((s) => s.id === session.studentId);
   const modified = { ...session, startHour, duration };
   const conflictId = hasOverlap(allSessions, modified);
-  const fee = (student?.pricePerHour ?? 0);
+  const fee = student?.pricePerHour ?? 0;
+
+  const handleCheckIn = () => {
+    setCheckedIn(true);
+    setAttended(true);
+    onSave({ ...session, startHour, duration, attended: true, checkedIn: true, note });
+  };
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle>Chỉnh sửa buổi học</DialogTitle>
+          <DialogTitle>Buổi học</DialogTitle>
         </DialogHeader>
         <div className="space-y-3 pt-1">
+
+          {/* Student info */}
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-full" style={{ backgroundColor: student?.color }} />
-            <span className="font-medium text-sm">{student?.name}</span>
-            <span className="text-xs text-muted-foreground ml-auto">{session.date}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Checkbox checked={attended} onCheckedChange={(v) => setAttended(!!v)} id="attended" />
-            <Label htmlFor="attended" className="text-sm">Có tập buổi này</Label>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="text-xs">Giờ bắt đầu</Label>
-              <Input type="number" value={startHour} onChange={(e) => setStartHour(Number(e.target.value))} min={6} max={21} />
-              {conflictId && (
-                <p className="text-xs text-destructive mt-1">Thời gian trùng với buổi khác</p>
-              )}
+            <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold"
+              style={{ backgroundColor: student?.color, color: student ? getTextColor(student.color) : "#fff" }}>
+              {student?.name.charAt(0)}
             </div>
             <div>
-              <Label className="text-xs">Thời lượng (giờ)</Label>
-              <Input type="number" value={duration} onChange={(e) => setDuration(Number(e.target.value))} min={0.5} max={8} step={0.5} />
+              <p className="font-medium text-sm">{student?.name}</p>
+              <p className="text-xs text-muted-foreground">{session.date} · {formatHour(session.startHour)} – {formatHour(session.startHour + session.duration)}</p>
             </div>
+            {checkedIn && (
+              <span className="ml-auto text-xs font-semibold px-2 py-0.5 rounded-full"
+                style={{ backgroundColor: "rgba(201,168,76,0.15)", color: "#C9A84C", border: "1px solid rgba(201,168,76,0.4)" }}>
+                ✓ Đã check-in
+              </span>
+            )}
           </div>
-          <div>
-            <Label className="text-xs">Tiền buổi</Label>
-            <p className="text-sm font-semibold text-primary">{formatVND(fee)}</p>
-          </div>
-          <div>
-            <Label className="text-xs">Ghi chú</Label>
-            <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ghi chú..." />
-          </div>
-          <div className="flex gap-2 pt-2">
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => onDelete(session.id)}
+
+          {/* Check-in + Off buttons */}
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={handleCheckIn}
+              disabled={checkedIn}
+              className="flex items-center justify-center gap-2 py-2.5 rounded-lg border text-sm font-medium transition-all disabled:opacity-40"
+              style={checkedIn
+                ? { borderColor: "rgba(201,168,76,0.5)", backgroundColor: "rgba(201,168,76,0.1)", color: "#C9A84C" }
+                : { borderColor: "rgba(201,168,76,0.3)", color: "#C9A84C" }}
             >
-              Xoá buổi
-            </Button>
-            <div className="flex-1" />
+              <Check className="w-4 h-4" />
+              {checkedIn ? "Đã check-in" : "Check-in"}
+            </button>
+            <button
+              onClick={() => setConfirmOff(true)}
+              className="flex items-center justify-center gap-2 py-2.5 rounded-lg border border-destructive/40 text-destructive text-sm font-medium hover:bg-destructive/10 transition-all"
+            >
+              <UserX className="w-4 h-4" />
+              Đột xuất nghỉ
+            </button>
+          </div>
+
+          {/* Confirm off dialog */}
+          {confirmOff && (
+            <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 space-y-2">
+              <p className="text-sm font-medium text-destructive">Xác nhận học viên nghỉ đột xuất?</p>
+              <p className="text-xs text-muted-foreground">Buổi học này sẽ bị xoá khỏi lịch và không tính vào học phí.</p>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={() => setConfirmOff(false)} className="flex-1">Huỷ</Button>
+                <Button size="sm" variant="destructive" onClick={() => onDelete(session.id)} className="flex-1">Xoá buổi</Button>
+              </div>
+            </div>
+          )}
+
+          <div className="border-t pt-3 space-y-3">
+            <div className="flex items-center gap-2">
+              <Checkbox checked={attended} onCheckedChange={(v) => setAttended(!!v)} id="attended" />
+              <Label htmlFor="attended" className="text-sm">Tính phí buổi này</Label>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Giờ bắt đầu</Label>
+                <Input type="number" value={startHour} onChange={(e) => setStartHour(Number(e.target.value))} min={0} max={23} />
+                {conflictId && <p className="text-xs text-destructive mt-1">Trùng giờ với buổi khác</p>}
+              </div>
+              <div>
+                <Label className="text-xs">Thời lượng (giờ)</Label>
+                <Input type="number" value={duration} onChange={(e) => setDuration(Number(e.target.value))} min={0.5} max={8} step={0.5} />
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs">Tiền buổi</Label>
+              <p className="text-sm font-semibold text-primary">{formatVND(fee)}</p>
+            </div>
+            <div>
+              <Label className="text-xs">Ghi chú</Label>
+              <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ghi chú..." />
+            </div>
+          </div>
+
+          <div className="flex gap-2 pt-1">
             <Button variant="outline" size="sm" onClick={onClose}>Đóng</Button>
+            <div className="flex-1" />
             <Button
               size="sm"
               disabled={!!conflictId}
-              onClick={() => onSave({ ...session, startHour, duration, attended, note })}
+              onClick={() => onSave({ ...session, startHour, duration, attended, checkedIn, note })}
             >
               Lưu
             </Button>
