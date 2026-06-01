@@ -4,6 +4,13 @@ import {
   onSnapshot, writeBatch,
 } from "firebase/firestore";
 import { db } from "./firebase";
+import { toast } from "sonner";
+
+function handleFirestoreError(e: unknown, action: string) {
+  console.error(`[Firestore] ${action}:`, e);
+  const msg = e instanceof Error ? e.message : String(e);
+  toast.error(`Lỗi Firebase (${action}): ${msg}`);
+}
 
 export interface PriceChange {
   effectiveFrom: string; // YYYY-MM-DD
@@ -134,7 +141,7 @@ export function useStore() {
 
   // ── Students ──────────────────────────────────────────────────────────────
   const addStudent = useCallback((s: Student) => {
-    setDoc(doc(db, "students", s.id), s).catch(console.error);
+    setDoc(doc(db, "students", s.id), s).catch((e) => handleFirestoreError(e, "addStudent"));
   }, []);
 
   const updateStudent = useCallback((s: Student) => {
@@ -151,9 +158,9 @@ export function useStore() {
           { effectiveFrom: today, price: s.pricePerHour },
         ],
       };
-      setDoc(doc(db, "students", s.id), updated).catch(console.error);
+      setDoc(doc(db, "students", s.id), updated).catch((e) => handleFirestoreError(e, "updateStudent"));
     } else {
-      setDoc(doc(db, "students", s.id), s).catch(console.error);
+      setDoc(doc(db, "students", s.id), s).catch((e) => handleFirestoreError(e, "updateStudent"));
     }
   }, [students]);
 
@@ -162,35 +169,35 @@ export function useStore() {
     batch.delete(doc(db, "students", id));
     sessions.filter((s) => s.studentId === id).forEach((s) => batch.delete(doc(db, "sessions", s.id)));
     payments.filter((p) => p.studentId === id).forEach((p) => batch.delete(doc(db, "payments", p.id)));
-    batch.commit().catch(console.error);
+    batch.commit().catch((e) => handleFirestoreError(e, "deleteStudent"));
   }, [sessions, payments]);
 
   // ── Sessions ──────────────────────────────────────────────────────────────
   const addSession = useCallback((s: Session) => {
-    setDoc(doc(db, "sessions", s.id), s).catch(console.error);
+    setDoc(doc(db, "sessions", s.id), s).catch((e) => handleFirestoreError(e, "addSession"));
   }, []);
 
   const addSessions = useCallback((list: Session[]) => {
     const batch = writeBatch(db);
     list.forEach((s) => batch.set(doc(db, "sessions", s.id), s));
-    batch.commit().catch(console.error);
+    batch.commit().catch((e) => handleFirestoreError(e, "addSessions"));
   }, []);
 
   const updateSession = useCallback((s: Session) => {
-    setDoc(doc(db, "sessions", s.id), s).catch(console.error);
+    setDoc(doc(db, "sessions", s.id), s).catch((e) => handleFirestoreError(e, "updateSession"));
   }, []);
 
   const deleteSession = useCallback((id: string) => {
-    deleteDoc(doc(db, "sessions", id)).catch(console.error);
+    deleteDoc(doc(db, "sessions", id)).catch((e) => handleFirestoreError(e, "deleteSession"));
   }, []);
 
   // ── Payments ──────────────────────────────────────────────────────────────
   const addPayment = useCallback((p: Payment) => {
-    setDoc(doc(db, "payments", p.id), p).catch(console.error);
+    setDoc(doc(db, "payments", p.id), p).catch((e) => handleFirestoreError(e, "addPayment"));
   }, []);
 
   const deletePayment = useCallback((id: string) => {
-    deleteDoc(doc(db, "payments", id)).catch(console.error);
+    deleteDoc(doc(db, "payments", id)).catch((e) => handleFirestoreError(e, "deletePayment"));
   }, []);
 
   // ── Clear all ─────────────────────────────────────────────────────────────
@@ -199,7 +206,7 @@ export function useStore() {
     students.forEach((s) => batch.delete(doc(db, "students", s.id)));
     sessions.forEach((s) => batch.delete(doc(db, "sessions", s.id)));
     payments.forEach((p) => batch.delete(doc(db, "payments", p.id)));
-    batch.commit().catch(console.error);
+    batch.commit().catch((e) => handleFirestoreError(e, "clearAll"));
   }, [students, sessions, payments]);
 
   return {
