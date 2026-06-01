@@ -12,6 +12,11 @@ function handleFirestoreError(e: unknown, action: string) {
   toast.error(`Lỗi Firebase (${action}): ${msg}`);
 }
 
+// Firestore không hỗ trợ undefined — xóa hết trước khi ghi
+function clean<T>(obj: T): T {
+  return JSON.parse(JSON.stringify(obj));
+}
+
 export interface PriceChange {
   effectiveFrom: string; // YYYY-MM-DD
   price: number;
