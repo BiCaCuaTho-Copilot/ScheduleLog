@@ -304,11 +304,12 @@ function StudentModal({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-md max-h-[90dvh] flex flex-col p-0">
+        <DialogHeader className="px-4 pt-4 pb-2 shrink-0 border-b">
           <DialogTitle>{student ? "Sửa học viên" : "Thêm học viên"}</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4 pt-2">
+        <div className="overflow-y-auto flex-1 px-4">
+        <div className="space-y-4 py-3">
           <div>
             <Label>Tên học viên *</Label>
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nhập tên" />
@@ -380,12 +381,14 @@ function StudentModal({
               ))}
             </div>
           </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={onClose}>Huỷ</Button>
-            <Button onClick={handleSave} disabled={!name.trim() || !price}>
-              {student ? "Lưu" : "Thêm"}
-            </Button>
-          </div>
+        </div>
+        </div>
+        {/* Nút cố định ở dưới — luôn hiển thị dù form dài */}
+        <div className="flex justify-end gap-2 px-4 py-3 border-t shrink-0 bg-card">
+          <Button variant="outline" onClick={onClose}>Huỷ</Button>
+          <Button onClick={handleSave} disabled={!name.trim() || !price}>
+            {student ? "Lưu" : "Thêm"}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
