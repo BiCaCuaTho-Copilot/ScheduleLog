@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import html2canvas from "html2canvas";
 import { useAppStore } from "@/components/Layout";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   DndContext, DragOverlay, useDraggable, useDroppable, pointerWithin,
   useSensor, useSensors, MouseSensor, TouchSensor,
@@ -13,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ChevronLeft, ChevronRight, FileDown, Copy, X, ImageDown, Mail, Check, UserX } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileDown, Copy, X, ImageDown, Mail, Check, UserX, Plus, Clock } from "lucide-react";
 import { toast } from "sonner";
 
 function formatHour(h: number): string {
@@ -56,6 +57,7 @@ function layoutSessions(sessions: Session[]): { sess: Session; col: number; numC
 }
 
 export default function SchedulePage() {
+  const isMobile = useIsMobile();
   const { data, addSession, updateSession, deleteSession, config } = useAppStore();
   const [currentMonday, setCurrentMonday] = useState(() => getMonday(new Date()));
   const [dragStudentId, setDragStudentId] = useState<string | null>(null);
@@ -226,6 +228,19 @@ export default function SchedulePage() {
       toast.error("Không thể xuất ảnh, thử lại");
     }
   }, [weekNum, year]);
+
+  if (isMobile) {
+    return (
+      <MobileScheduleView
+        currentMonday={currentMonday}
+        setCurrentMonday={setCurrentMonday}
+        weekNum={weekNum}
+        year={year}
+        weekDays={weekDays}
+        todayStr={todayStr}
+      />
+    );
+  }
 
   return (
     <DndContext sensors={sensors} collisionDetection={pointerWithin} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
@@ -563,6 +578,315 @@ function DroppableCell({ id, isToday, isHalf }: { id: string; isToday: boolean; 
       style={{ height: 30 }}
       className={`border-r ${isHalf ? "border-b border-dashed opacity-60" : "border-b"} ${isToday ? "bg-primary/[0.04]" : ""} ${isOver ? "bg-primary/10" : ""}`}
     />
+  );
+}
+
+// ─── Mobile Schedule View ─────────────────────────────────────────────────────
+function MobileScheduleView({
+  currentMonday, setCurrentMonday, weekNum, year, weekDays, todayStr,
+}: {
+  currentMonday: Date;
+  setCurrentMonday: (d: Date) => void;
+  weekNum: number;
+  year: number;
+  weekDays: Date[];
+  todayStr: string;
+}) {
+  const { data, updateSession, deleteSession, addSession, config } = useAppStore();
+  const [selectedDay, setSelectedDay] = useState(todayStr);
+  const [editSession, setEditSession] = useState<Session | null>(null);
+  const [addModalOpen, setAddModalOpen] = useState(false);
+
+  const prevWeek = () => {
+    const d = new Date(currentMonday);
+    d.setDate(d.getDate() - 7);
+    setCurrentMonday(d);
+  };
+  const nextWeek = () => {
+    const d = new Date(currentMonday);
+    d.setDate(d.getDate() + 7);
+    setCurrentMonday(d);
+  };
+
+  const daySessions = useMemo(() =>
+    data.sessions
+      .filter((s) => s.date === selectedDay)
+      .sort((a, b) => a.startHour - b.startHour),
+    [data.sessions, selectedDay]
+  );
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Week navigation */}
+      <div className="flex items-center justify-between px-3 py-2 border-b bg-card">
+        <button onClick={prevWeek} className="p-1.5 rounded-lg hover:bg-muted">
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+        <span className="font-semibold text-sm">Tuần {weekNum} — {year}</span>
+        <button onClick={nextWeek} className="p-1.5 rounded-lg hover:bg-muted">
+          <ChevronRight className="w-5 h-5" />
+        </button>
+      </div>
+
+      {/* Day selector */}
+      <div className="flex border-b bg-card overflow-x-auto">
+        {weekDays.map((day, i) => {
+          const dateStr = toDateStr(day);
+          const isToday = dateStr === todayStr;
+          const isSelected = dateStr === selectedDay;
+          const count = data.sessions.filter((s) => s.date === dateStr).length;
+          return (
+            <button
+              key={dateStr}
+              onClick={() => setSelectedDay(dateStr)}
+              className={`flex-1 min-w-[44px] py-2 flex flex-col items-center gap-0.5 transition-colors relative ${
+                isSelected ? "bg-primary/10" : "hover:bg-muted/50"
+              }`}
+            >
+              <span className={`text-[10px] font-medium ${isToday ? "text-primary" : "text-muted-foreground"}`}>
+                {DAY_NAMES[i]}
+              </span>
+              <span className={`text-sm font-bold ${isSelected ? "text-primary" : isToday ? "text-primary" : ""}`}>
+                {String(day.getDate()).padStart(2, "0")}
+              </span>
+              {count > 0 && (
+                <span className="w-1.5 h-1.5 rounded-full bg-primary absolute bottom-1" />
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Session list */}
+      <div className="flex-1 overflow-y-auto p-3 space-y-2">
+        {daySessions.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">
+            <Clock className="w-10 h-10 opacity-30" />
+            <p className="text-sm">Không có buổi học hôm nay</p>
+            <button
+              onClick={() => setAddModalOpen(true)}
+              className="text-sm text-primary font-medium"
+            >
+              + Thêm buổi học
+            </button>
+          </div>
+        ) : (
+          daySessions.map((sess) => {
+            const student = data.students.find((s) => s.id === sess.studentId);
+            if (!student) return null;
+            const tc = getTextColor(student.color);
+            return (
+              <button
+                key={sess.id}
+                onClick={() => setEditSession(sess)}
+                className="w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all active:scale-[0.98]"
+                style={{
+                  borderColor: sess.checkedIn ? "#C9A84C" : undefined,
+                  boxShadow: sess.checkedIn ? "0 0 0 1px #C9A84C40" : undefined,
+                }}
+              >
+                <div
+                  className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0"
+                  style={{ backgroundColor: student.color, color: tc }}
+                >
+                  {sess.checkedIn ? "✓" : student.name.charAt(0)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm">{student.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {formatHour(sess.startHour)} – {formatHour(sess.startHour + sess.duration)} · {sess.duration}h
+                  </p>
+                  {sess.note && <p className="text-xs text-muted-foreground truncate">{sess.note}</p>}
+                </div>
+                <div className="flex flex-col items-end gap-1">
+                  {sess.checkedIn && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ backgroundColor: "#C9A84C20", color: "#C9A84C" }}>
+                      Check-in
+                    </span>
+                  )}
+                  {!sess.attended && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                      Không tính phí
+                    </span>
+                  )}
+                  <span className="text-xs text-primary font-medium">{formatVND(student.pricePerHour)}</span>
+                </div>
+              </button>
+            );
+          })
+        )}
+      </div>
+
+      {/* FAB - Add session */}
+      <button
+        onClick={() => setAddModalOpen(true)}
+        className="fixed right-4 bottom-24 w-14 h-14 rounded-full flex items-center justify-center shadow-lg z-30 transition-transform active:scale-95"
+        style={{ backgroundColor: "#C9A84C", color: "#0D0D0D" }}
+      >
+        <Plus className="w-6 h-6 stroke-[2.5]" />
+      </button>
+
+      {/* Edit modal */}
+      {editSession && (
+        <SessionEditModal
+          session={editSession}
+          allSessions={data.sessions}
+          students={data.students}
+          onClose={() => setEditSession(null)}
+          onSave={(s) => { updateSession(s); setEditSession(null); toast.success("Đã cập nhật"); }}
+          onDelete={(id) => { deleteSession(id); setEditSession(null); toast.success("Đã xoá buổi học"); }}
+        />
+      )}
+
+      {/* Add session modal */}
+      <MobileAddSessionModal
+        open={addModalOpen}
+        onClose={() => setAddModalOpen(false)}
+        defaultDate={selectedDay}
+        weekDays={weekDays}
+        students={data.students}
+        allSessions={data.sessions}
+        defaultDuration={config.schedule.defaultDuration}
+        defaultAttended={config.schedule.defaultAttended}
+        onAdd={(s) => { addSession(s); toast.success("Đã thêm buổi học"); setAddModalOpen(false); }}
+      />
+    </div>
+  );
+}
+
+function MobileAddSessionModal({
+  open, onClose, defaultDate, weekDays, students, allSessions,
+  defaultDuration, defaultAttended, onAdd,
+}: {
+  open: boolean;
+  onClose: () => void;
+  defaultDate: string;
+  weekDays: Date[];
+  students: Student[];
+  allSessions: Session[];
+  defaultDuration: number;
+  defaultAttended: boolean;
+  onAdd: (s: Session) => void;
+}) {
+  const [studentId, setStudentId] = useState("");
+  const [selectedDate, setSelectedDate] = useState(defaultDate);
+  const [startHour, setStartHour] = useState(8);
+  const [duration, setDuration] = useState(defaultDuration);
+  const [attended, setAttended] = useState(defaultAttended);
+
+  useEffect(() => {
+    if (open) {
+      setStudentId("");
+      setSelectedDate(defaultDate);
+      setStartHour(8);
+      setDuration(defaultDuration);
+      setAttended(defaultAttended);
+    }
+  }, [open, defaultDate, defaultDuration, defaultAttended]);
+
+  const activeStudents = students.filter((s) => s.status === "active");
+  const newSess: Session = { id: "tmp", studentId, date: selectedDate, startHour, duration, attended, note: "" };
+  const conflict = studentId ? hasOverlap(allSessions, newSess) : null;
+
+  const handleAdd = () => {
+    if (!studentId) return;
+    onAdd({ ...newSess, id: uuid() });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-sm max-h-[90dvh] flex flex-col p-0">
+        <DialogHeader className="px-4 pt-4 pb-2 shrink-0 border-b">
+          <DialogTitle>Thêm buổi học</DialogTitle>
+        </DialogHeader>
+        <div className="overflow-y-auto flex-1 px-4 py-3 space-y-4">
+          {/* Student picker */}
+          <div>
+            <Label className="text-xs mb-2 block">Học viên *</Label>
+            <div className="grid grid-cols-2 gap-2">
+              {activeStudents.map((s) => (
+                <button
+                  key={s.id}
+                  onClick={() => setStudentId(s.id)}
+                  className={`flex items-center gap-2 p-2.5 rounded-lg border text-left transition-all ${
+                    studentId === s.id ? "border-primary bg-primary/10" : "border-border"
+                  }`}
+                >
+                  <div
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+                    style={{ backgroundColor: s.color, color: getTextColor(s.color) }}
+                  >
+                    {s.name.charAt(0)}
+                  </div>
+                  <span className="text-xs font-medium truncate">{s.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Day picker */}
+          <div>
+            <Label className="text-xs mb-2 block">Ngày trong tuần</Label>
+            <div className="grid grid-cols-7 gap-1">
+              {weekDays.map((day, i) => {
+                const dateStr = toDateStr(day);
+                return (
+                  <button
+                    key={dateStr}
+                    onClick={() => setSelectedDate(dateStr)}
+                    className={`flex flex-col items-center py-2 rounded-lg border text-center transition-all ${
+                      selectedDate === dateStr ? "border-primary bg-primary/10 text-primary" : "border-border"
+                    }`}
+                  >
+                    <span className="text-[9px]">{DAY_NAMES[i]}</span>
+                    <span className="text-xs font-bold">{day.getDate()}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Time */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs">Giờ bắt đầu</Label>
+              <Input
+                type="number"
+                value={startHour}
+                onChange={(e) => setStartHour(Number(e.target.value))}
+                min={0} max={23} step={0.5}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Thời lượng (h)</Label>
+              <select
+                value={duration}
+                onChange={(e) => setDuration(Number(e.target.value))}
+                className="mt-1 w-full border border-border rounded-md px-3 py-2 bg-input text-foreground text-sm"
+              >
+                {[0.5,1,1.5,2,2.5,3,3.5,4].map((d) => (
+                  <option key={d} value={d}>{d}h</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {conflict && <p className="text-xs text-destructive">⚠️ Trùng lịch với buổi học khác</p>}
+
+          <div className="flex items-center gap-2">
+            <Checkbox id="mob-attended" checked={attended} onCheckedChange={(v) => setAttended(!!v)} />
+            <Label htmlFor="mob-attended" className="text-sm">Tính phí buổi này</Label>
+          </div>
+        </div>
+        <div className="flex gap-2 px-4 py-3 border-t shrink-0">
+          <Button variant="outline" className="flex-1" onClick={onClose}>Huỷ</Button>
+          <Button className="flex-1" disabled={!studentId || !!conflict} onClick={handleAdd}>
+            Thêm
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
