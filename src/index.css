@@ -1,54 +1,59 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 220 20% 97%;
-    --foreground: 224 30% 15%;
+    /* ── Dark Gold / Equinox Theme ─────────────────────────────── */
 
-    --card: 0 0% 100%;
-    --card-foreground: 224 30% 15%;
+    --background: 0 0% 5%;           /* #0D0D0D — near black */
+    --foreground: 40 25% 90%;        /* #EDE8DF — warm off-white */
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 224 30% 15%;
+    --card: 0 0% 9%;                 /* #171717 */
+    --card-foreground: 40 25% 90%;
 
-    --primary: 230 70% 55%;
-    --primary-foreground: 0 0% 100%;
+    --popover: 0 0% 11%;             /* #1C1C1C */
+    --popover-foreground: 40 25% 90%;
 
-    --secondary: 220 15% 93%;
-    --secondary-foreground: 224 30% 15%;
+    --primary: 43 52% 54%;           /* #C9A84C — gold */
+    --primary-foreground: 0 0% 5%;   /* dark text on gold */
 
-    --muted: 220 15% 93%;
-    --muted-foreground: 220 10% 50%;
+    --secondary: 0 0% 14%;           /* #242424 */
+    --secondary-foreground: 40 20% 80%;
 
-    --accent: 230 60% 96%;
-    --accent-foreground: 230 70% 45%;
+    --muted: 0 0% 13%;               /* #212121 */
+    --muted-foreground: 0 0% 48%;    /* #7A7A7A */
 
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 0 0% 100%;
+    --accent: 43 18% 16%;            /* #282318 — subtle gold tint */
+    --accent-foreground: 43 52% 65%; /* lighter gold */
 
-    --success: 142 60% 45%;
-    --success-foreground: 0 0% 100%;
+    --destructive: 0 65% 48%;
+    --destructive-foreground: 0 0% 98%;
 
-    --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 100%;
+    --success: 142 50% 40%;
+    --success-foreground: 0 0% 98%;
 
-    --border: 220 15% 90%;
-    --input: 220 15% 90%;
-    --ring: 230 70% 55%;
+    --warning: 38 85% 48%;
+    --warning-foreground: 0 0% 5%;
 
-    --radius: 0.75rem;
+    --border: 0 0% 17%;              /* #2B2B2B */
+    --input: 0 0% 14%;               /* #242424 */
+    --ring: 43 52% 54%;              /* gold ring */
 
-    --sidebar-background: 228 25% 18%;
-    --sidebar-foreground: 220 20% 85%;
-    --sidebar-primary: 230 70% 60%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 228 20% 24%;
-    --sidebar-accent-foreground: 220 20% 90%;
-    --sidebar-border: 228 20% 25%;
-    --sidebar-ring: 230 70% 55%;
-    --sidebar-muted: 228 15% 40%;
+    --radius: 0.4rem;                /* more angular = luxury */
+
+    /* ── Sidebar: pure black ───────────────────────────────────── */
+    --sidebar-background: 0 0% 4%;         /* #0A0A0A */
+    --sidebar-foreground: 0 0% 58%;        /* #949494 */
+    --sidebar-primary: 43 52% 54%;         /* gold */
+    --sidebar-primary-foreground: 0 0% 5%;
+    --sidebar-accent: 0 0% 8%;             /* #141414 */
+    --sidebar-accent-foreground: 40 25% 88%;
+    --sidebar-border: 0 0% 11%;            /* #1C1C1C */
+    --sidebar-ring: 43 52% 54%;
+    --sidebar-muted: 0 0% 38%;             /* #616161 */
   }
 }
 
@@ -56,38 +61,83 @@
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-weight: 400;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Luxury headings */
+  h1, h2 {
+    font-family: 'Playfair Display', Georgia, serif;
+    letter-spacing: -0.01em;
+  }
+
+  h3, h4 {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-weight: 600;
+    letter-spacing: 0.02em;
   }
 }
 
+/* ── Gold divider utility ─────────────────────────────────────────── */
 @layer utilities {
+  .gold-divider {
+    height: 1px;
+    background: linear-gradient(to right, transparent, hsl(43 52% 54% / 0.5), transparent);
+  }
+
+  .gold-glow {
+    box-shadow: 0 0 20px hsl(43 52% 54% / 0.15);
+  }
+
   .sidebar-transition {
     @apply transition-all duration-200 ease-in-out;
   }
+
   .card-hover {
-    @apply transition-shadow duration-200 hover:shadow-md;
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  }
+  .card-hover:hover {
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5), 0 0 0 1px hsl(43 52% 54% / 0.2);
+    border-color: hsl(43 52% 54% / 0.3);
   }
 }
 
-/* Custom scrollbar */
+/* ── Scrollbar ────────────────────────────────────────────────────── */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted-foreground) / 0.3);
-  border-radius: 3px;
+  background: hsl(0 0% 25%);
+  border-radius: 2px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--muted-foreground) / 0.5);
+  background: hsl(43 52% 40%);
 }
 
-/* Schedule grid */
+/* ── Sidebar gold top-border accent ──────────────────────────────── */
+aside {
+  border-right: 1px solid hsl(var(--sidebar-border));
+}
+aside::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(to right, transparent, hsl(43 52% 54% / 0.6), transparent);
+  pointer-events: none;
+}
+
+/* ── Schedule grid ────────────────────────────────────────────────── */
 .schedule-grid {
   display: grid;
   grid-template-columns: 60px repeat(7, 1fr);
@@ -99,29 +149,53 @@
   position: relative;
 }
 .schedule-cell.today {
-  background: hsl(var(--primary) / 0.04);
+  background: hsl(43 52% 54% / 0.04);
 }
+
+/* ── Session block ────────────────────────────────────────────────── */
 .session-block {
-  border-radius: 6px;
+  border-radius: 4px;
   padding: 4px 8px;
   font-size: 0.75rem;
   cursor: pointer;
-  transition: box-shadow 0.15s;
+  transition: box-shadow 0.15s, filter 0.15s;
 }
 .session-block:hover {
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.5);
+  filter: brightness(1.1);
 }
 .session-block.conflict-flash {
   animation: conflict-flash 0.3s ease-in-out 3;
 }
 @keyframes conflict-flash {
   0%, 100% { box-shadow: 0 0 0 0 transparent; }
-  50% { box-shadow: 0 0 0 3px hsl(var(--destructive) / 0.6); }
+  50% { box-shadow: 0 0 0 3px hsl(var(--destructive) / 0.7); }
 }
 
-/* Drag overlay */
+/* ── Drag overlay ─────────────────────────────────────────────────── */
 .drag-overlay {
-  opacity: 0.85;
-  transform: scale(1.05);
-  box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+  opacity: 0.9;
+  transform: scale(1.04);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6), 0 0 0 1px hsl(43 52% 54% / 0.3);
+}
+
+/* ── Input & Button luxury tweaks ────────────────────────────────── */
+input[type="text"],
+input[type="number"],
+input[type="email"],
+input[type="date"],
+input[type="month"] {
+  background-color: hsl(var(--input));
+  border-color: hsl(var(--border));
+  color: hsl(var(--foreground));
+}
+input:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 1px hsl(43 52% 54% / 0.6);
+  border-color: hsl(43 52% 54% / 0.5);
+}
+
+/* ── Table row hover ─────────────────────────────────────────────── */
+tbody tr:hover {
+  background-color: hsl(43 18% 10%);
 }
