@@ -21,20 +21,25 @@ const navItems = [
   { path: "/settings", label: "Cài đặt", icon: Settings },
 ];
 
+function isActive(path: string, pathname: string) {
+  return pathname === path || (path === "/students" && pathname === "/");
+}
+
+// ── Desktop sidebar ──────────────────────────────────────────────────────────
 function SidebarNav() {
   const location = useLocation();
   const { config } = useAppStore();
   return (
-    <aside className="fixed left-0 top-0 bottom-0 w-56 bg-sidebar flex flex-col z-30">
+    <aside className="fixed left-0 top-0 bottom-0 w-56 bg-sidebar flex-col z-30 hidden md:flex">
       <div className="p-5 border-b border-sidebar-border">
         <h1 className="text-lg font-bold text-sidebar-primary-foreground flex items-center gap-2">
-          <CalendarDays className="w-5 h-5 text-sidebar-primary" />
-          <span>{config.studioName}</span>
+          <CalendarDays className="w-5 h-5 text-sidebar-primary shrink-0" />
+          <span className="truncate">{config.studioName}</span>
         </h1>
       </div>
       <nav className="flex-1 p-3 space-y-1">
         {navItems.map(({ path, label, icon: Icon }) => {
-          const active = location.pathname === path || (path === "/students" && location.pathname === "/");
+          const active = isActive(path, location.pathname);
           return (
             <Link
               key={path}
@@ -59,6 +64,44 @@ function SidebarNav() {
   );
 }
 
+// ── Mobile top header ─────────────────────────────────────────────────────────
+function MobileHeader() {
+  const { config } = useAppStore();
+  return (
+    <header className="fixed top-0 left-0 right-0 z-30 flex items-center px-4 h-12 bg-sidebar border-b border-sidebar-border md:hidden">
+      <CalendarDays className="w-4 h-4 text-primary mr-2 shrink-0" />
+      <span className="font-bold text-sm text-sidebar-primary-foreground truncate">{config.studioName}</span>
+    </header>
+  );
+}
+
+// ── Mobile bottom navigation ──────────────────────────────────────────────────
+function BottomNav() {
+  const location = useLocation();
+  return (
+    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-sidebar border-t border-sidebar-border md:hidden">
+      <div className="flex items-center justify-around py-1.5 px-1">
+        {navItems.map(({ path, label, icon: Icon }) => {
+          const active = isActive(path, location.pathname);
+          return (
+            <Link
+              key={path}
+              to={path}
+              className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg transition-colors ${
+                active ? "text-primary" : "text-sidebar-foreground"
+              }`}
+            >
+              <Icon className={`w-5 h-5 ${active ? "stroke-[2.5]" : ""}`} />
+              <span className="text-[10px] font-medium">{label}</span>
+            </Link>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}
+
+// ── Loading screen ────────────────────────────────────────────────────────────
 function LoadingScreen() {
   return (
     <div className="fixed inset-0 bg-background flex flex-col items-center justify-center gap-4 z-50">
@@ -68,6 +111,7 @@ function LoadingScreen() {
   );
 }
 
+// ── Root layout ───────────────────────────────────────────────────────────────
 export default function Layout({ children }: { children: React.ReactNode }) {
   const store = useStore();
   const configStore = useConfig();
@@ -78,7 +122,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       ) : (
         <div className="min-h-screen">
           <SidebarNav />
-          <main className="ml-56 min-h-screen">
+          <MobileHeader />
+          <BottomNav />
+          {/* Desktop: offset sidebar. Mobile: top header + bottom nav padding */}
+          <main className="md:ml-56 pt-12 md:pt-0 pb-20 md:pb-0 min-h-screen">
             {children}
           </main>
         </div>

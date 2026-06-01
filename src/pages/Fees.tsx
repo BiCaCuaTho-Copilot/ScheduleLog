@@ -79,7 +79,7 @@ export default function FeesPage() {
   const months = [...new Set(data.payments.map((p) => p.date.slice(0, 7)))].sort().reverse();
 
   return (
-    <div className="p-6 max-w-4xl">
+    <div className="p-3 md:p-6 max-w-4xl">
       <h2 className="text-2xl font-bold mb-6">Học phí</h2>
 
       {/* Payment form */}
@@ -148,8 +148,8 @@ export default function FeesPage() {
         {filteredPayments.length === 0 ? (
           <p className="text-sm text-muted-foreground py-8 text-center">Chưa có thanh toán nào</p>
         ) : (
-          <div className="bg-card border rounded-lg overflow-hidden">
-            <table className="w-full text-sm">
+          <div className="bg-card border rounded-lg overflow-hidden overflow-x-auto">
+            <table className="w-full text-sm min-w-[500px]">
               <thead>
                 <tr className="border-b bg-muted/50">
                   <th className="text-left p-3 font-medium">Học viên</th>

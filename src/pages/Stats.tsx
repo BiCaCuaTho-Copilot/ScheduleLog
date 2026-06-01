@@ -12,7 +12,7 @@ import {
 
 export default function StatsPage() {
   return (
-    <div className="p-6 max-w-5xl">
+    <div className="p-3 md:p-6 max-w-5xl">
       <h2 className="text-2xl font-bold mb-6">Thống kê</h2>
       <IncomeSummary />
       <Tabs defaultValue="week">
@@ -103,8 +103,8 @@ function equivText(amount: number, pricePerSession: number) {
 
 function StudentTable({ rows }: { rows: StudentRow[] }) {
   return (
-    <div className="bg-card border rounded-lg overflow-hidden">
-      <table className="w-full text-sm">
+    <div className="bg-card border rounded-lg overflow-hidden overflow-x-auto">
+      <table className="w-full text-sm min-w-[600px]">
         <thead>
           <tr className="border-b bg-muted/50">
             <th className="text-left p-3 font-medium">Học viên</th>
@@ -475,8 +475,8 @@ function DebtStats() {
       </div>
       <SummaryCards totalFee={grandFee} totalPaid={grandPaid} debt={grandDebt} overpaid={grandOver} />
       {rows.length > 0 ? (
-        <div className="bg-card border rounded-lg overflow-hidden">
-          <table className="w-full text-sm">
+        <div className="bg-card border rounded-lg overflow-hidden overflow-x-auto">
+          <table className="w-full text-sm min-w-[700px]">
             <thead>
               <tr className="border-b bg-muted/50">
                 <th className="text-left p-3 font-medium">Học viên</th>

@@ -260,7 +260,7 @@ function DangerSection() {
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function SettingsPage() {
   return (
-    <div className="p-6 max-w-2xl">
+    <div className="p-3 md:p-6 max-w-2xl">
       <h2 className="text-2xl font-bold mb-6">Cài đặt</h2>
       <BackupSection />
       <StudioSection />

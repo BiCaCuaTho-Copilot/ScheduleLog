@@ -229,9 +229,9 @@ export default function SchedulePage() {
 
   return (
     <DndContext sensors={sensors} collisionDetection={pointerWithin} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <div className="flex h-screen">
-        {/* Left sidebar - students */}
-        <div className="w-52 border-r bg-card p-3 overflow-y-auto shrink-0">
+      <div className="flex h-[calc(100vh-3rem)] md:h-screen">
+        {/* Left sidebar - students (hidden on mobile) */}
+        <div className="w-52 border-r bg-card p-3 overflow-y-auto shrink-0 hidden md:block">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
             Kéo vào lịch
           </p>
@@ -262,23 +262,30 @@ export default function SchedulePage() {
         {/* Right - schedule grid */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Week navigation */}
-          <div className="flex items-center gap-3 p-3 border-b bg-card">
+          <div className="flex flex-wrap items-center gap-2 p-2 md:p-3 border-b bg-card">
             <Button variant="ghost" size="icon" onClick={prevWeek}><ChevronLeft className="w-4 h-4" /></Button>
-            <span className="font-semibold text-sm min-w-[140px] text-center">Tuần {weekNum} — {year}</span>
+            <span className="font-semibold text-sm text-center">Tuần {weekNum} — {year}</span>
             <Button variant="ghost" size="icon" onClick={nextWeek}><ChevronRight className="w-4 h-4" /></Button>
             <Input
               type="month"
               value={monthStr}
               onChange={(e) => goToMonth(e.target.value)}
-              className="w-42 h-8 text-sm"
+              className="w-36 h-8 text-sm"
             />
             <Button variant="outline" size="sm" onClick={goToday}>Hôm nay</Button>
-            <div className="flex-1" />
-            <Button variant="outline" size="sm" onClick={() => setCopyModalOpen(true)} className="gap-1">
+            <div className="hidden md:flex flex-1" />
+            <Button variant="outline" size="sm" onClick={() => setCopyModalOpen(true)} className="gap-1 hidden md:flex">
               <Copy className="w-3.5 h-3.5" /> Copy lịch
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setExportModalOpen(true)} className="gap-1">
+            <Button variant="outline" size="sm" onClick={() => setExportModalOpen(true)} className="gap-1 hidden md:flex">
               <FileDown className="w-3.5 h-3.5" /> Xuất lịch học
+            </Button>
+            {/* Mobile: icon-only buttons */}
+            <Button variant="outline" size="icon" onClick={() => setCopyModalOpen(true)} className="md:hidden h-8 w-8">
+              <Copy className="w-3.5 h-3.5" />
+            </Button>
+            <Button variant="outline" size="icon" onClick={() => setExportModalOpen(true)} className="md:hidden h-8 w-8">
+              <FileDown className="w-3.5 h-3.5" />
             </Button>
           </div>
 
