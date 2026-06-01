@@ -1,4 +1,5 @@
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import html2canvas from "html2canvas";
 import { useAppStore } from "@/components/Layout";
 import {
   DndContext, DragOverlay, useDraggable, useDroppable, pointerWithin,
@@ -6,13 +7,13 @@ import {
   type DragEndEvent, type DragStartEvent,
 } from "@dnd-kit/core";
 import { uuid, getTextColor, hasOverlap, getMonday, getWeekDays, toDateStr, getISOWeek, DAY_NAMES, formatVND } from "@/lib/helpers";
-import type { Session, Student } from "@/lib/store";
+import type { Session, Student, AppData } from "@/lib/store";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ChevronLeft, ChevronRight, FileDown, Copy, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileDown, Copy, X, ImageDown, Mail } from "lucide-react";
 import { toast } from "sonner";
 
 function formatHour(h: number): string {
@@ -62,6 +63,8 @@ export default function SchedulePage() {
   const [editSession, setEditSession] = useState<Session | null>(null);
   const [conflictFlash, setConflictFlash] = useState<string | null>(null);
   const [copyModalOpen, setCopyModalOpen] = useState(false);
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+  const scheduleRef = useRef<HTMLDivElement>(null);
   const [studentSearch, setStudentSearch] = useState("");
   // grab offset: where within the session block the user clicked (px from top of block)
   const grabOffsetRef = useRef(0);
@@ -201,99 +204,28 @@ export default function SchedulePage() {
     }
   };
 
-  const exportHTML = () => {
-    const HOUR_H = 60;
-    const SLOT_H = 30;
-    const FIRST_H = HOURS[0];
-    const HALF_H = HOURS.flatMap((h) => [h, h + 0.5]);
-
-    const textColorOf = (hex: string) => {
-      const r = parseInt(hex.slice(1, 3), 16);
-      const g = parseInt(hex.slice(3, 5), 16);
-      const b = parseInt(hex.slice(5, 7), 16);
-      return r * 0.299 + g * 0.587 + b * 0.114 > 160 ? "#1e1b4b" : "#ffffff";
-    };
-
-    const timeLabelCol = HALF_H.map((slot) => {
-      const isHalf = slot % 1 !== 0;
-      const label = formatHour(slot);
-      return `<div style="height:${SLOT_H}px;border-bottom:1px ${isHalf ? "dashed #ddd" : "solid #e2e5ed"};display:flex;align-items:center;justify-content:flex-end;padding-right:8px;font-size:${isHalf ? 9 : 11}px;color:${isHalf ? "#bbb" : "#888"};">${label}</div>`;
-    }).join("");
-
-    const dayCols = weekDays.map((day) => {
-      const dateStr = toDateStr(day);
-      const isToday = dateStr === todayStr;
-      const daySessions = data.sessions.filter((s) => s.date === dateStr);
-      const laid = layoutSessions(daySessions);
-
-      const slots = HALF_H.map((slot) => {
-        const isHalf = slot % 1 !== 0;
-        return `<div style="height:${SLOT_H}px;border-bottom:1px ${isHalf ? "dashed #eee" : "solid #e2e5ed"};"></div>`;
-      }).join("");
-
-      const sessions = laid.map(({ sess, col, numCols }) => {
-        const student = data.students.find((s) => s.id === sess.studentId);
-        if (!student) return "";
-        const top = (sess.startHour - FIRST_H) * HOUR_H + 2;
-        const height = sess.duration * HOUR_H - 4;
-        const lPct = (col / numCols) * 100;
-        const wPct = (1 / numCols) * 100;
-        const tc = textColorOf(student.color);
-        return `<div style="position:absolute;top:${top}px;height:${height}px;left:calc(${lPct}% + 2px);width:calc(${wPct}% - 4px);background:${student.color};color:${tc};border-radius:6px;padding:4px 8px;font-size:11px;overflow:hidden;box-sizing:border-box;z-index:1;">
-  <div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">● ${student.name}</div>
-  <div style="opacity:0.85;font-size:10px;">${formatHour(sess.startHour)} · ${sess.duration}h</div>
-</div>`;
-      }).join("");
-
-      return `<div style="flex:1;min-width:0;border-right:1px solid #e2e5ed;">
-  <div style="position:relative;background:${isToday ? "#f8f9ff" : "#fff"};">${slots}${sessions}</div>
-</div>`;
-    }).join("");
-
-    const html = `<!DOCTYPE html>
-<html lang="vi">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Lịch học Tuần ${weekNum} — ${year}</title>
-<style>
-*{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:Inter,system-ui,-apple-system,sans-serif;background:#eef0f6;padding:24px;}
-h1{text-align:center;margin-bottom:16px;font-size:20px;font-weight:700;color:#1e1b4b;}
-.wrap{background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.08);}
-.header-row{display:flex;border-bottom:2px solid #e2e5ed;}
-.corner{width:60px;flex-shrink:0;background:#f5f6fa;}
-.body-row{display:flex;}
-.time-col{width:60px;flex-shrink:0;background:#f5f6fa;border-right:1px solid #e2e5ed;}
-.days{flex:1;display:flex;min-width:0;}
-</style>
-</head>
-<body>
-<h1>📅 Lịch học Tuần ${weekNum} — ${year}</h1>
-<div class="wrap">
-  <div class="header-row"><div class="corner"></div>${weekDays.map((day, i) => {
-    const isToday = toDateStr(day) === todayStr;
-    const dd = String(day.getDate()).padStart(2, "0");
-    const mm = String(day.getMonth() + 1).padStart(2, "0");
-    return `<div style="flex:1;text-align:center;padding:10px 4px;font-size:12px;background:${isToday ? "#e8edff" : "#f5f6fa"};color:${isToday ? "#3b52cc" : "#555"};border-right:1px solid #e2e5ed;"><div style="font-weight:700;">${DAY_NAMES[i]}</div><div style="font-size:11px;">${dd}/${mm}</div></div>`;
-  }).join("")}</div>
-  <div class="body-row">
-    <div class="time-col">${timeLabelCol}</div>
-    <div class="days">${dayCols}</div>
-  </div>
-</div>
-</body>
-</html>`;
-
-    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `lich-hoc-tuan-${weekNum}-${year}.html`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success("Đã xuất lịch học HTML");
-  };
+  const exportAsImage = useCallback(async () => {
+    const el = scheduleRef.current;
+    if (!el) return;
+    toast("Đang chụp lịch học...", { duration: 2000 });
+    try {
+      const canvas = await html2canvas(el, {
+        backgroundColor: "#0D0D0D",
+        scale: 2,
+        useCORS: true,
+        logging: false,
+      });
+      const link = document.createElement("a");
+      link.download = `lich-hoc-tuan-${weekNum}-${year}.png`;
+      link.href = canvas.toDataURL("image/png");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success("Đã lưu ảnh lịch học");
+    } catch {
+      toast.error("Không thể xuất ảnh, thử lại");
+    }
+  }, [weekNum, year]);
 
   return (
     <DndContext sensors={sensors} collisionDetection={pointerWithin} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
@@ -345,14 +277,14 @@ h1{text-align:center;margin-bottom:16px;font-size:20px;font-weight:700;color:#1e
             <Button variant="outline" size="sm" onClick={() => setCopyModalOpen(true)} className="gap-1">
               <Copy className="w-3.5 h-3.5" /> Copy lịch
             </Button>
-            <Button variant="outline" size="sm" onClick={exportHTML} className="gap-1">
+            <Button variant="outline" size="sm" onClick={() => setExportModalOpen(true)} className="gap-1">
               <FileDown className="w-3.5 h-3.5" /> Xuất lịch học
             </Button>
           </div>
 
           {/* Grid */}
           <div className="flex-1 overflow-auto">
-            <div className="schedule-grid min-w-[900px]">
+            <div ref={scheduleRef} className="schedule-grid min-w-[900px]">
 
               {/* ── Header row ── */}
               <div className="border-b border-r bg-muted/50 p-2" />
@@ -475,6 +407,17 @@ h1{text-align:center;margin-bottom:16px;font-size:20px;font-weight:700;color:#1e
         })() : null}
       </DragOverlay>
 
+      {/* Export modal */}
+      <ExportModal
+        open={exportModalOpen}
+        onClose={() => setExportModalOpen(false)}
+        onExportImage={() => { setExportModalOpen(false); exportAsImage(); }}
+        weekNum={weekNum}
+        year={year}
+        weekDays={weekDays}
+        data={data}
+      />
+
       {/* Copy schedule modal */}
       <CopyScheduleModal
         open={copyModalOpen}
@@ -590,6 +533,124 @@ function DroppableCell({ id, isToday, isHalf }: { id: string; isToday: boolean; 
       style={{ height: 30 }}
       className={`border-r ${isHalf ? "border-b border-dashed opacity-60" : "border-b"} ${isToday ? "bg-primary/[0.04]" : ""} ${isOver ? "bg-primary/10" : ""}`}
     />
+  );
+}
+
+function ExportModal({
+  open, onClose, onExportImage, weekNum, year, weekDays, data,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onExportImage: () => void;
+  weekNum: number;
+  year: number;
+  weekDays: Date[];
+  data: AppData;
+}) {
+  const [gmailStudentId, setGmailStudentId] = useState("");
+
+  const studentsWithEmail = data.students.filter((s) => s.email);
+
+  const scheduleText = useMemo(() => {
+    const lines: string[] = [`📅 Lịch học Tuần ${weekNum} — ${year}\n`];
+    weekDays.forEach((day, i) => {
+      const dateStr = toDateStr(day);
+      const dd = String(day.getDate()).padStart(2, "0");
+      const mm = String(day.getMonth() + 1).padStart(2, "0");
+      const daySessions = data.sessions
+        .filter((s) => s.date === dateStr)
+        .sort((a, b) => a.startHour - b.startHour);
+      lines.push(`${DAY_NAMES[i]}, ${dd}/${mm}:`);
+      if (daySessions.length === 0) {
+        lines.push("  (Trống)");
+      } else {
+        daySessions.forEach((sess) => {
+          const student = data.students.find((s) => s.id === sess.studentId);
+          if (!student) return;
+          lines.push(`  • ${student.name}: ${formatHour(sess.startHour)} – ${formatHour(sess.startHour + sess.duration)} (${sess.duration}h)`);
+        });
+      }
+      lines.push("");
+    });
+    return lines.join("\n");
+  }, [weekNum, year, weekDays, data]);
+
+  const handleOpenGmail = () => {
+    const student = data.students.find((s) => s.id === gmailStudentId);
+    const to = student?.email ?? "";
+    const subject = encodeURIComponent(`Lịch học Tuần ${weekNum} — ${year}`);
+    const body = encodeURIComponent(scheduleText);
+    const url = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(to)}&su=${subject}&body=${body}`;
+    window.open(url, "_blank");
+    onClose();
+    toast.success("Đã mở Gmail soạn thảo");
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Xuất lịch học — Tuần {weekNum}/{year}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 pt-1">
+          {/* Option 1: Image */}
+          <button
+            onClick={onExportImage}
+            className="w-full flex items-start gap-4 p-4 rounded-lg border border-border hover:border-primary/50 hover:bg-accent/30 transition-all text-left group"
+          >
+            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
+              <ImageDown className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <p className="font-semibold text-sm">Lưu hình ảnh về máy</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Chụp lịch dưới dạng ảnh PNG, lưu vào thiết bị</p>
+            </div>
+          </button>
+
+          {/* Option 2: Gmail */}
+          <div className="p-4 rounded-lg border border-border space-y-3">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-lg bg-destructive/10 flex items-center justify-center shrink-0">
+                <Mail className="w-5 h-5 text-destructive" />
+              </div>
+              <div>
+                <p className="font-semibold text-sm">Gửi qua Gmail</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Mở Gmail soạn thảo với nội dung lịch học</p>
+              </div>
+            </div>
+            {studentsWithEmail.length === 0 ? (
+              <p className="text-xs text-muted-foreground pl-14">Chưa có học viên nào có email. Thêm email trong trang Học viên.</p>
+            ) : (
+              <div className="pl-14 space-y-2">
+                <select
+                  value={gmailStudentId}
+                  onChange={(e) => setGmailStudentId(e.target.value)}
+                  className="w-full text-sm border border-border rounded-md px-3 py-1.5 bg-input text-foreground"
+                >
+                  <option value="">Chọn học viên nhận mail...</option>
+                  {studentsWithEmail.map((s) => (
+                    <option key={s.id} value={s.id}>{s.name} — {s.email}</option>
+                  ))}
+                </select>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={!gmailStudentId}
+                  onClick={handleOpenGmail}
+                  className="gap-2 w-full"
+                >
+                  <Mail className="w-3.5 h-3.5" /> Mở Gmail
+                </Button>
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end">
+            <Button variant="ghost" size="sm" onClick={onClose}>Đóng</Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
